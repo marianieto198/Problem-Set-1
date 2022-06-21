@@ -401,3 +401,54 @@ ggplot(geih_p, aes(x = p6426, y = ingtotes)) +
   scale_y_continuous(labels = scales::dollar) +
   # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
   labs(x = "Experiencia en el oficio actual", y = "Ingresos totales (Escala log)")
+  
+  ggplot() +
+  geom_bar(data = geih_sinna, aes(x = sex), 
+           fill = "darkblue", alpha = 0.5) +
+  labs(x = "Sexo", y = "Frequencia") + 
+  theme_classic()
+
+ggplot() +
+  geom_bar(data = geih_sinna, aes(x = clase), 
+           fill = "darkblue", alpha = 0.5) +
+  labs(x = "Zona", y = "Frequencia") + 
+  theme_classic()
+
+##Todas las observaciones se encuentran en zona urbana, por lo que no se tendrá en cuenta
+##Esta variable de interés en el modelo.
+
+ggplot() +
+  geom_bar(data = geih_p, aes(x = ocu), 
+           fill = "darkblue", alpha = 0.5) +
+  labs(x = "Zona", y = "Frequencia") + 
+  theme_classic()
+
+##La variable ocupación cuenta con una cantidad significativa de NAs, por lo que tampoco se tendrá en cuenta.
+#Tablas
+
+our_summary1 <-
+  list("Ingreso Total" =
+         list("min"       = ~ min(ingtotes),
+              "max"       = ~ max(ingtotes),
+              "mean (sd)" = ~ qwraps2::mean_sd(ingtotes)),
+       "Horas Trabajadas" =
+         list("min"       = ~ min(totalHoursWorked),
+              "median"    = ~ median(totalHoursWorked),
+              "max"       = ~ max(totalHoursWorked),
+              "mean (sd)" = ~ qwraps2::mean_sd(totalHoursWorked)),
+       "Experiencia" =
+         list("min"       = ~ min(p6426),
+              "max"       = ~ max(p6426),
+              "mean (sd)" = ~ qwraps2::mean_sd(p6426)),
+       "Nivel Educativo" =
+         list("Uno" = ~ qwraps2::n_perc0(p6210 == 1),
+              "Dos"  = ~ qwraps2::n_perc0(p6210 == 2),
+              "Tres"  = ~ qwraps2::n_perc0(p6210 == 3),
+              "Cuatro" = ~ qwraps2::n_perc0(p6210== 4),
+              "Cinco"  = ~ qwraps2::n_perc0(p6210 == 5),
+              "Seis"  = ~ qwraps2::n_perc0(p6210 == 6))
+  )
+
+by_sex <- summary_table(dplyr::group_by(geih_p, sex), our_summary1)
+by_sex
+

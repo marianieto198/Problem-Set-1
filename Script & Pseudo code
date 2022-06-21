@@ -1,0 +1,403 @@
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#%    Data Acquisition    		          %
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+##Paquetes 
+rm(list = ls())
+install.packages("rvest")
+install.packages("pacman")
+install.packages("ggpubr")
+install.packages("devtools")
+devtools::install_github("thomasp85/patchwork")
+
+library(ggplot2)
+library(patchwork)
+p_load(rio) 
+p_load(tidyverse)
+p_load(e1071) 
+p_load(EnvStats) 
+p_load(tidymodels) 
+p_load(ggplot2) 
+p_load(scales) 
+p_load(ggpubr) 
+p_load(knitr) 
+p_load(kableExtra)
+p_load(ggplot2)
+
+
+
+require(pacman)
+library(rvest)
+library(pacman)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+
+
+#1. En un primer momento se explora el link para verificar la manera en la que está presentada la información
+#En este caso, la muestra de GEIH se presenta en una tabla fija, por lo que es más fácil realizar el scrape.
+
+#2. Ahora, con el uso del click derecho se inspecciona la página y se obtiene el url de acceso para el código html desde la ventana de network
+#Se realiza un loop para cada chunk de valores
+
+#Se define la base vacía que será llenada por la información en el url
+GEIH <- data.frame(stringsAsFactors = FALSE)
+#Para cada chunk de información se extrae un temporal para scrapear la información
+for (i in 1:10) {
+  url <- paste0("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_", i ,".html" , collapse = " ") 
+  temp <- read_html(url)  %>%
+    html_table()  
+#Se pegan las filas de información de cada temp y se va llenando la GEIH 
+  GEIH <-  rbind(GEIH, temp) 
+}
+
+##La anterior que explicó Lucas no me sirvió por lo que planteé la siguiente manera:
+
+#1.
+#Crear una lista vacia en donde se van a almacenar las tablas tomadas del sitio web.
+data=list()
+#Loop para importar las 10 tablas y añadir a la lista data
+for (i in 1:10){
+  url=paste0('https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_',i,'.html')
+  temp=read_html(url) %>%
+    html_table()
+  data=append(data,temp)
+}
+
+#Loop para concatenar las bases de datos y formar GEIH
+geih=data.frame()
+for (i in 1:10){
+  geih=rbind(geih,data[[i]])
+}
+#Se evidencia que no hay restricciones para acceder a los datos y realizar el scrapping, lo anterior por lo que se
+#mencionó con anterioridad de que al ser chunks de información fijos facilita la lectura y extracción de los datos.
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#%    Data Cleaning   		          %
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+##Ya al tener lista la base de datos GEIH contamos con 178 variables y 32177 observaciones.
+##Ahora bien, se empezará analizando las dimensiones de la base 
+dim(geih)
+str(geih)
+##Ahora se corrigen las variables para que sean leídas como categóricas, bulein o string dependiendo del caso. 
+##Lo anterior, ya que en su mayoría fueron leídas como enteros.
+##Se definen entonces las variables categóricas
+
+##En primer lugar eliminamos la primera variable ya que no cuenta con datos relevantes
+geih <- geih[, 2:ncol(geih)]
+
+geih <- geih %>%
+  mutate_at(.vars = c(
+    "cclasnr11", "cclasnr2", "cclasnr3", "cclasnr4", "cclasnr5",
+    "cclasnr6", "cclasnr7", "cclasnr8", "clase", "college",
+    "cotPension", "cuentaPropia", "depto", "directorio", "dominio",
+    "dsi", "estrato1", "formal", "ina", "inac", "informal",
+    "maxEducLevel", "p6050", "microEmpresa", "ocu", "oficio", 
+    "orden", "p6090", "p6100", "p6210", "p6210s1", "p6240", "p6510",
+    "p6510s2", "p6545", "p6545s2", "p6580", "p6580s2", "p6585s1",
+    "p6585s1a2", "p6585s2", "p6585s2a2", "p6585s4", "p6585s4a2",
+    "p6590", "p6610", "p6620", "p6630s1", "p6630s2", "p6630s3",
+    "p6630s4", "p6630s6", "p6920", "p7040", "p7050", "p7090",
+    "p7110", "p7120", "p7140s1", "p7140s2", "p7150", "p7160",
+    "p7310", "p7350", "p7422", "p7472", "p7495", "p7500s1",
+    "p7500s2", "p7500s3", "p7505", "p7510s1", "p7510s2",
+    "p7510s3", "p7510s5", "p7510s6", "p7510s7", "pea", "pet", 
+    "regSalud", "relab", "secuencia_p", "sex", "sizeFirm", "wap"),
+    .funs = factor)
+
+str(geih)
+
+##Antes de realizar las descriptivas es necesario analizar los missing values para identificar el comportamiento de la muestra ya delimitada
+summary(geih[, c("sex","age")])
+
+##Tratamiento de missing values
+
+cantidad_na <- sapply(geih, function(x) sum(is.na(x)))
+cantidad_na <- data.frame(cantidad_na)
+porcentaje_na <- cantidad_na/nrow(geih)
+
+# Porcentaje de observaciones faltantes. 
+porcentaje <- mean(porcentaje_na[,1])
+print(paste0("En promedio el ", round(porcentaje*100, 2), "% de las entradas están vacías"))
+
+##Ordenamos de mayor a menor
+porcentaje_na <- arrange(porcentaje_na, desc(cantidad_na))
+# Convertimos el nombre de la fila en columna
+porcentaje_na <- rownames_to_column(porcentaje_na, "variable")
+
+# Quitamos las variables que no tienen NAs
+filtro <- porcentaje_na$cantidad_na == 0
+variables_sin_na <- porcentaje_na[filtro, "variable"]
+variables_sin_na <- paste(variables_sin_na, collapse = ", ")
+print(paste("Las variables sin NAs son:", variables_sin_na))
+
+porcentaje_na <- porcentaje_na[!filtro,]
+
+orden <- porcentaje_na$variable[length(porcentaje_na$variable):1]
+porcentaje_na$variable <- factor(porcentaje_na$variable,
+                                 levels = orden)
+
+# Como son tantas variables vamos a hacer 3 gráficas
+ggplot(porcentaje_na[1:50,], 
+       aes(y = variable, x = cantidad_na)) +
+  geom_bar(stat = "identity", fill = "darkblue") +
+  geom_text(aes(label = paste0(round(100*cantidad_na, 1), "%")),
+            colour = "white", position = "dodge", hjust = 1.3,
+            size = 2, fontface = "bold") +
+  theme_classic() +
+  labs(x = "Porcentaje de NAs", y = "Variables") +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 1))
+
+ggplot(porcentaje_na[51:100,], 
+       aes(y = variable, x = cantidad_na)) +
+  geom_bar(stat = "identity", fill = "darkblue") +
+  geom_text(aes(label = paste0(round(100*cantidad_na, 1), "%")),
+            colour = "white", position = "dodge", hjust = 1.3,
+            size = 2, fontface = "bold") +
+  theme_classic() +
+  labs(x = "Porcentaje de NAs", y = "Variables") +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 1))
+
+ggplot(porcentaje_na[101:nrow(porcentaje_na),], 
+       aes(y = variable, x = cantidad_na)) +
+  geom_bar(stat = "identity", fill = "darkblue") +
+  geom_text(aes(label = paste0(round(100*cantidad_na, 1), "%")),
+            colour = "white", position = "dodge", hjust = 1.3,
+            size = 2, fontface = "bold") +
+  theme_classic() +
+  labs(x = "Porcentaje de NAs", y = "Variables") +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 1))
+
+#Si la cantidad de missing values es superior al 5% no se pueden imputar los datos (crearlos a partir de la media o la moda)
+##Se eliminan las variables que tienen más del 5% de NAs
+filtro2 <- porcentaje_na$cantidad_na > 0.05
+variables_eliminadas <- porcentaje_na$variable[filtro2]
+geih_sinna <- geih %>%
+  select(-variables_eliminadas) 
+
+tail(cantidad_na)
+moda_p6210 <- which(table(geih_sinna$p6210) == max(table(geih_sinna$p6210)))
+
+filtro2 <- is.na(geih_sinna$p6210)
+geih_sinna$p6210[filtro2] <- moda_p6210
+table(geih_sinna$p6210)
+
+geih_sinna %>%
+  is.na()%>%
+  sum()
+
+##Normalizar los datos 
+
+# Primero seleccionamos las columnas numéricas
+filtro <- sapply(geih, is.numeric)
+geih_escalada <- geih
+geih_escalada[,filtro] <- scale(geih[,filtro])
+
+# Podemos obtener las medias y las desviaciones con las que se hizo la transformación
+lista <- attributes(geih_escalada)
+medias <- lista$`scaled:center`
+desviaciones <-  lista$`scaled:scale`
+
+# Visualicemos los resultados de media y desviación
+
+# Media
+apply(geih_escalada[,filtro], MARGIN = 2, 
+      function(x) round(mean(x, na.rm = T), 2))
+
+apply(geih_escalada[,filtro], MARGIN = 2, 
+      function(x) round(sd(x, na.rm = T), 2))
+
+head(geih_escalada)
+
+##Transformaciones para resolver asimetrías
+
+# Primero seleccionamos las columnas numéricas
+filtro <- sapply(geih, is.numeric)
+sk <- sapply(geih[, filtro], skewness, na.rm = T)
+
+# Vamos a buscar las variables con las mayores asimetrías sin importar la dirección
+sk_abs <- abs(sk)
+sk_abs <- data.frame(sk_abs)
+sk_abs <- rownames_to_column(sk_abs, "variable")
+sk_abs <- arrange(sk_abs, desc(sk_abs))
+
+# Las variables con mayor asimetría son:
+head(sk_abs)
+
+ggplot(geih, aes(x=ingtotes)) + geom_histogram(fill="darkblue", alpha=0.3)
+ggplot(geih, aes(x=log(ingtotes))) + geom_histogram(fill="darkblue", alpha=0.3)
+
+pload(e1071)
+
+# Construimos el vector de los ingresos y eliminamos los NAs 
+x <- geih$ingtotes[!is.na(geih$ingtotes)]
+sk_x <- skewness(x)
+print(paste("El valor de skewness para los ingresos totales imputados es", round(sk_x, 2)))
+
+x <- log(geih$ingtotes[!is.na(geih$ingtotes)])
+sk_x <- skewness(x)
+print(paste("El valor de skewness para los ingresos totales imputados es", round(sk_x, 2)))
+
+# Vamos a aplicar diferentes transformaciones y a visualizar como cambia el skewness
+# Encontrar lambda óptimo
+lambda <- boxcox(x, objective.name = "Log-Likelihood", 
+                 optimize = TRUE)$lambda
+box_cox_x <- boxcoxTransform(x, lambda)
+
+ing_tot <- data.frame("Ingresos totales" = x,
+                      "Logaritmo" = log(x),
+                      "Raiz cuadrada" = sqrt(x),
+                      "Inversa" = 1/x,
+                      "Box-Cox" = box_cox_x)
+
+
+# Observemos la distribución original
+p1 <- ggplot(ing_tot) +
+  geom_histogram(aes(x = Ingresos.totales, 
+                     fill = "Ingresos totales"), 
+                 alpha = 0.5, fill = "gray", bins = 30) +
+  geom_text(aes(x = Inf, y = Inf, hjust = 1, 
+                vjust = 1, 
+                label = paste("Skewness", round(sk_x, 2)))) +
+  theme_classic() +
+  labs(x = "Ingresos totales", y = "Cantidad") +
+  scale_x_continuous(labels = scales::dollar)
+
+sk_x2 <- skewness(ing_tot$Logaritmo)
+p2 <- ggplot(ing_tot) +
+  geom_histogram(aes(x = Logaritmo, 
+                     fill = "Logaritmo"), 
+                 alpha = 0.5, fill = "blue", bins = 30) +
+  geom_text(aes(x = Inf, y = Inf, hjust = 1, 
+                vjust = 1, 
+                label = paste("Skewness", round(sk_x2, 2)))) +
+  theme_classic() +
+  labs(x = "Log(Ingresos totales)", y = "Cantidad") 
+
+sk_x3 <- skewness(ing_tot$Raiz.cuadrada)
+p3 <- ggplot(ing_tot) +
+  geom_histogram(aes(x = Raiz.cuadrada, 
+                     fill = "Raíz cuadrada"), 
+                 alpha = 0.5, fill = "red", bins = 30) +
+  geom_text(aes(x = Inf, y = Inf, hjust = 1, 
+                vjust = 1, 
+                label = paste("Skewness", round(sk_x3, 2)))) +
+  theme_classic() +
+  labs(x = "Raiz cuadrada de Ingresos totales", y = "Cantidad") 
+
+sk_x4 <- skewness(ing_tot$Inversa)
+p4 <- ggplot(ing_tot) +
+  geom_histogram(aes(x = Inversa, 
+                     fill = "Inversa"), 
+                 alpha = 0.5, fill = "green", bins = 30) +
+  geom_text(aes(x = Inf, y = Inf, hjust = 1, 
+                vjust = 1, 
+                label = paste("Skewness", round(sk_x4, 2)))) +
+  theme_classic() +
+  labs(x = "1/(Ingresos totales)", y = "Cantidad")
+
+sk_x5 <- skewness(ing_tot$Box.Cox)
+p5 <- ggplot(ing_tot) +
+  geom_histogram(aes(x = Box.Cox, 
+                     fill = "Box-Cox"), 
+                 alpha = 0.5, fill = "purple", bins = 30) +
+  geom_text(aes(x = Inf, y = Inf, hjust = 1, 
+                vjust = 1, 
+                label = paste("Skewness", round(sk_x5, 2)))) +
+  theme_classic() +
+  labs(x = "Transformacion Box-Cox de Ingresos totales", 
+       y = "Cantidad")
+
+ggarrange(p1, p2, p3, p4, p5, nrow = 3, ncol = 2)
+
+##U otra opción es 
+
+(p1 | p2 | p3) /
+  (p4 | p5)
+
+ggplot(geih, aes(x = totalHoursWorked, y = ingtotes)) +
+  geom_point(color = "darkblue", alpha = 0.5) +
+  theme_classic() +
+  scale_y_continuous(labels = scales::dollar) +
+  # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
+  labs(x = "Horas trabajadas", y = "Ingresos totales (Escala log)")
+
+ggplot(geih, aes(y = totalHoursWorked)) +
+  geom_boxplot(fill = "darkblue", alpha = 0.5) +
+  theme_classic() +
+  labs(y = "Horas trabajadas") +
+  scale_x_discrete( ) 
+
+ggplot(geih, aes(y = ingtotes)) +
+  geom_boxplot(fill = "darkblue", alpha = 0.5) +
+  theme_classic() +
+  labs(y = "Ingresos totales") +
+  scale_y_continuous(labels = scales::dollar) +
+  scale_x_discrete( ) 
+
+##Eliminamos una única observación que indica un ingreso total de $50 millones.
+geih_p=geih[geih$ingtotes<40000000,]
+
+ggplot(geih_p, aes(y = ingtotes)) +
+  geom_boxplot(fill = "darkblue", alpha = 0.5) +
+  theme_classic() +
+  labs(y = "Ingresos totales") +
+  scale_y_continuous(labels = scales::dollar) +
+  scale_x_discrete( ) 
+
+##Estadísticas descriptivas, tablas y figuras
+
+#Variables de interés defindas: 
+
+#De acuerdo a las instrucciones del ejercicio se mantiene en la muestra las observaciones que correspondan a
+#Personas ocupadas de 18 años o mayores.
+geih_p=geih_p[geih_p$age>=18,]
+geih_p=geih_p[geih_p$ocu==1,]
+
+geih_sinna=geih_sinna[geih_sinna$age>=18,]
+geih_sinna=geih_sinna[geih_sinna$ocu==1,]
+
+
+##Las variables que se considera pueden influir en el salario es si se encuentran en una zona urbana-rural,
+##el sexo, el número de horas trabajadas, el nivel máximo de educación alcanzado, el oficio y la experiencia en el oficio actual
+##(clase (urbano-rural), maxEducLevel (sim. P6210),  oficio, sex, totalHoursWorked, P6426 (experiencia en oficio actual))
+
+ggplot(geih_p, aes(x = totalHoursWorked, y = ingtotes)) +
+  geom_point(color = "darkblue", alpha = 0.5) +
+  theme_classic() +
+  scale_y_continuous(labels = scales::dollar) +
+  # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
+  labs(x = "Horas trabajadas", y = "Ingresos totales (Escala log)")
+
+ggplot(geih_p, aes(y = totalHoursWorked)) +
+  geom_boxplot(fill = "darkblue", alpha = 0.5) +
+  theme_classic() +
+  labs(y = "Horas trabajadas") +
+  scale_x_discrete( ) 
+
+ggplot(geih_p, aes(x = totalHoursWorked, y = ingtotes)) +
+  geom_point(color = "darkblue", alpha = 0.5) +
+  theme_classic() +
+  scale_y_continuous(labels = scales::dollar) +
+  # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
+  labs(x = "Horas trabajadas", y = "Ingresos totales (Escala log)")
+
+ggplot(geih_p, aes(y = totalHoursWorked)) +
+  geom_boxplot(fill = "darkblue", alpha = 0.5) +
+  theme_classic() +
+  labs(y = "Horas trabajadas") +
+  scale_x_discrete( ) 
+
+ggplot() +
+  geom_bar(data = geih_sinna, aes(x = p6210), 
+           fill = "darkblue", alpha = 0.5) +
+  labs(x = "Nivel educativo", y = "Frequencia") + 
+  theme_classic()
+
+ggplot(geih_p, aes(x = p6426, y = ingtotes)) +
+  geom_point(color = "darkblue", alpha = 0.5) +
+  theme_classic() +
+  scale_y_continuous(labels = scales::dollar) +
+  # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
+  labs(x = "Experiencia en el oficio actual", y = "Ingresos totales (Escala log)")

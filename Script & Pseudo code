@@ -452,3 +452,69 @@ our_summary1 <-
 by_sex <- summary_table(dplyr::group_by(geih_p, sex), our_summary1)
 by_sex
 
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#%    Age-earnings profile 		          %
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+##El ingreso total observado es  la suma de los ingresos percibidos en las siguientes fuentes: 
+#ingreso monetario primera actividad (impa), ingreso segunda actividad (isa), ingreso en especie (ie), 
+#ingreso monetario desocupados e inactivos (imdi) e ingresos provenientes de otras fuentes no laborales (iof) (intereses, pensiones, ayudas,
+#cesantias, arriendos y otros) .
+
+#El ingreso total imputado es la suma de cada una de las fuentes de ingresos 
+#imputadas a los registros faltantes
+
+#El ingreso total es la suma de cada una de las fuentes de ingresos
+#tanto observadas como imputadas.
+
+geih_p <- geih_p %>%
+  mutate(geih_p, age2=age^2)
+modelOLS <- lm(ingtot ~ age+age2, data = geih_p)
+summary(modelOLS)
+require("stargazer")
+stargazer(modelOLS,type="text")
+##R squared del 2%
+
+length(predict(modelOLS)) == length(geih_p$ingtot)
+plot(predict(modelOLS), geih_p$ingtot[1:length(predict(modelOLS))])
+abline(a=0, b=1)
+
+plot(x = predict(modelOLS), y = geih_p$ingtot,
+    xlab='Predicted Values',
+    ylab='Actual Values',
+    main='Predicted vs. Actual Values')
+abline(a=0, b=1)
+
+# plot predicted values and actual values
+
+ggplot(geih_p, aes(x = Predictvalues, y = ingtot)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = "green")
+
+##What is the “peak age” suggested by the above equation? Use bootstrap to calculate the standard errors and construct the confidence intervals.
+
+require("tidyverse")
+set.seed(1111)
+R<-1000 # Number of Repetions
+eta_mod1<-rep(0,R)
+
+for (i in 1:R){
+  geih_sample<- sample_frac(geih_p,size=1,replace=TRUE)
+  f <-lm(ingtot ~ age+age2, geih_sample)
+  coefs<-f$coefficients
+  eta_mod1[i]<-coefs[2]
+}  
+  plot(hist(eta_mod1))
+  mean(eta_mod1)
+  sqrt(var(eta_mod1))
+  quantile(eta_mod1,c(0.025,0.975))
+  
+##O con el comando boot 
+  
+  require("boot")
+  Predictvalues <- function(geih_p, index) {
+    coef(lm(ingtot ~ age+age2, data = geih_p, subset = index))
+    
+  } 
+  
+boot(geih_p, Predictvalues, R = 1000)

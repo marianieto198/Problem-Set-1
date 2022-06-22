@@ -34,24 +34,34 @@ library(ggplot2)
 library(ggpubr)
 
 
+
 #1. En un primer momento se explora el link para verificar la manera en la que está presentada la información
 #En este caso, la muestra de GEIH se presenta en una tabla fija, por lo que es más fácil realizar el scrape.
 
 #2. Ahora, con el uso del click derecho se inspecciona la página y se obtiene el url de acceso para el código html desde la ventana de network
 #Se realiza un loop para cada chunk de valores
 
-#Se define la base vacía que será llenada por la información en el url
-GEIH <- data.frame(stringsAsFactors = FALSE)
-#Para cada chunk de información se extrae un temporal para scrapear la información
-for (i in 1:10) {
-  url <- paste0("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_", i ,".html" , collapse = " ") 
-  temp <- read_html(url)  %>%
+#3. Se define la base vacía o la base inicial que será llenada por la información scrapeada de los url
+Pagina1 <- read_html("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_1.html") %>%
+                    html_table()  
+class(Pagina1)
+
+Pagina1 <- as.data.frame(Pagina1)
+df <- Pagina1
+
+#3.1.Para cada chunk de información se extrae un temporal en donde se irá almacenando la información de cada chunk. 
+#Para este paso se utiliza el comando “for” junto con el comando “paste0” para concatenar los diferentes url en un único elemento. 
+for (i in 2:10) {
+   url <- paste0("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_",i,".html") 
+  chunk_i <- read_html(url)  %>%
     html_table()  
-#Se pegan las filas de información de cada temp y se va llenando la GEIH 
-  GEIH <-  rbind(GEIH, temp) 
+  chunk_i <- as.data.frame(chunk_i)
+#3.2.Se utiliza el comando rbind para pegar las filas de información almacenadas en cada archivo temporal y unificarlas en un único elemento.
+ df <-  rbind(df, chunk_i) 
 }
 
-##La anterior que explicó Lucas no me sirvió por lo que planteé la siguiente manera:
+geih <- df
+###Otra opción es la siguiente:
 
 #1.
 #Crear una lista vacia en donde se van a almacenar las tablas tomadas del sitio web.
@@ -69,6 +79,7 @@ geih=data.frame()
 for (i in 1:10){
   geih=rbind(geih,data[[i]])
 }
+
 #Se evidencia que no hay restricciones para acceder a los datos y realizar el scrapping, lo anterior por lo que se
 #mencionó con anterioridad de que al ser chunks de información fijos facilita la lectura y extracción de los datos.
 

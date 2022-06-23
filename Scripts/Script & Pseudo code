@@ -95,9 +95,6 @@ str(geih)
 ##Lo anterior, ya que en su mayoría fueron leídas como enteros.
 ##Se definen entonces las variables categóricas
 
-##En primer lugar eliminamos la primera variable ya que no cuenta con datos relevantes
-geih <- geih[, 2:ncol(geih)]
-
 geih <- geih %>%
   mutate_at(.vars = c(
     "cclasnr11", "cclasnr2", "cclasnr3", "cclasnr4", "cclasnr5",
@@ -164,36 +161,19 @@ porcentaje_na$variable <- factor(porcentaje_na$variable,
 
 str(porcentaje_na) # Se revisa el tipo de variables
 
-# Como son tantas variables vamos a hacer 3 gráficas
-ggplot(porcentaje_na[1:50,], 
-       aes(y = variable, x = cantidad_na)) +
-  geom_bar(stat = "identity", fill = "darkblue") +
-  geom_text(aes(label = paste0(round(100*cantidad_na, 1), "%")),
-            colour = "white", position = "dodge", hjust = 1.3,
-            size = 2, fontface = "bold") +
-  theme_classic() +
-  labs(x = "Porcentaje de NAs", y = "Variables") +
-  scale_x_continuous(labels = scales::percent, limits = c(0, 1))
-
-ggplot(porcentaje_na[51:100,], 
-       aes(y = variable, x = cantidad_na)) +
-  geom_bar(stat = "identity", fill = "darkblue") +
-  geom_text(aes(label = paste0(round(100*cantidad_na, 1), "%")),
-            colour = "white", position = "dodge", hjust = 1.3,
-            size = 2, fontface = "bold") +
-  theme_classic() +
-  labs(x = "Porcentaje de NAs", y = "Variables") +
-  scale_x_continuous(labels = scales::percent, limits = c(0, 1))
+# Como son tantas variables vamos a hacer una gráfica con los que tienen menos NAs
+#para analizar si se pueden imputar los valores
 
 ggplot(porcentaje_na[101:nrow(porcentaje_na),], 
        aes(y = variable, x = cantidad_na)) +
-  geom_bar(stat = "identity", fill = "darkblue") +
+  geom_bar(stat = "identity", fill = "darkslategray3") +
   geom_text(aes(label = paste0(round(100*cantidad_na, 1), "%")),
             colour = "white", position = "dodge", hjust = 1.3,
             size = 2, fontface = "bold") +
   theme_classic() +
   labs(x = "Porcentaje de NAs", y = "Variables") +
   scale_x_continuous(labels = scales::percent, limits = c(0, 1))
+
 
 Hay un salto de 36% de NAs de la variable ie a 10.6% de la variable  y_total_m 
 
@@ -201,11 +181,11 @@ Hay un salto de 36% de NAs de la variable ie a 10.6% de la variable  y_total_m
 ##Se eliminan las variables que tienen más del 5% de NAs
 filtro2 <- porcentaje_na$cantidad_na > 0.05
 variables_eliminadas <- porcentaje_na$variable[filtro2]
-geih_sinna <- geih %>%
+geih_clean <- geih %>%
   select(-variables_eliminadas) 
 k0 <- ncol(geih)
-k1 <- ncol(geih_sinna)
-print(paste("Se eliminarion", k0-k1, "variables. Ahora la base tiene", k1, "columnas."))
+k1 <- ncol(geih_clean)
+print(paste("Se eliminaron", k0-k1, "variables. Ahora la base tiene", k1, "columnas."))
 #Ahora solo tenemos 62 variables
 
 porcentaje_na %>%
@@ -213,61 +193,63 @@ porcentaje_na %>%
 #Nos quedan 4 variables con NAs: impa, p7070, isa, maxEducLevel
  
 #Como tres variables son continuas se reemplaza por la mediana, para que queden en el percentil 50% 
-geih_sinna <- geih_sinna %>%
+geih_clean <- geih_clean %>%
             mutate(impa = ifelse(is.na(impa), median(impa, na.rm = T), impa), #Mediana sin tener en cuenta los NAs
                    p7070 = ifelse(is.na(p7070), median(p7070, na.rm = T), p7070),
                    isa = ifelse(is.na(isa), median(isa, na.rm = T), isa))
 
 
-sum(is.na(geih_sinna$impa)) #Reviso
-sum(is.na(geih_sinna$p7070)) #Reviso
-sum(is.na(geih_sinna$isa)) #Reviso
+sum(is.na(geih_clean$impa)) #Reviso
+sum(is.na(geih_clean$p7070)) #Reviso
+sum(is.na(geih_clean$isa)) #Reviso
 
 #Para MaxLevelEduc toca sacar la moda y eso lo hacemos mirando su plot y después reemplazando
-ggplot(geih_sinna, aes(x = maxEducLevel)) + geom_bar()
+ggplot(geih_clean, aes(x = maxEducLevel)) + geom_bar()
 
 #La moda es la categoría 7
-moda_MaxEduc <- which(table(geih_sinna$maxEducLevel) == max(table(geih_sinna$maxEducLevel))) #Guardo el mayor valor
-filtro2 <- is.na(geih_sinna$maxEducLevel) #filtro solo los NAs
-geih_sinna$maxEducLevel[filtro2] <- moda_MaxEduc #Reemplazo los NAs por la moda
-table(geih_sinna$maxEducLevel) #Reviso
+moda_MaxEduc <- which(table(geih_clean$maxEducLevel) == max(table(geih_clean$maxEducLevel))) #Guardo el mayor valor
+filtro2 <- is.na(geih_clean$maxEducLevel) #filtro solo los NAs
+geih_clean$maxEducLevel[filtro2] <- moda_MaxEduc #Reemplazo los NAs por la moda
+table(geih_clean$maxEducLevel) #Reviso
 
-sum(is.na(geih_sinna$maxEducLevel)) #Reviso
+sum(is.na(geih_clean$maxEducLevel)) #Reviso
 
-geih_sinna %>% #Se revisa que todo el DF esté sin NAs
+geih_clean %>% #Se revisa que todo el DF esté sin NAs
           is.na() %>%
           sum()
 
 
 
-##Normalizar los datos 
+##Existe la opción de normalizar los datos, se agregará el código de manera demostrativa
+#Sin embargo, no se nirmalizarán los datos para facilitar su interpretación.
 
 # Primero seleccionamos las columnas numéricas
-filtro <- sapply(geih_sinna, is.numeric)
-geih_escalada <- geih_sinna
-geih_escalada[,filtro] <- scale(geih[,filtro])
+#filtro <- sapply(geih, is.numeric)
+#geih_escalada <- geih
+#geih_escalada[,filtro] <- scale(geih[,filtro])
 
 # Podemos obtener las medias y las desviaciones con las que se hizo la transformación
-lista <- attributes(geih_escalada)
-medias <- lista$`scaled:center`
-desviaciones <-  lista$`scaled:scale`
+#lista <- attributes(geih_escalada)
+#medias <- lista$`scaled:center`
+#desviaciones <-  lista$`scaled:scale`
 
 # Visualicemos los resultados de media y desviación
 
 # Media
-apply(geih_escalada[,filtro], MARGIN = 2, 
-      function(x) round(mean(x, na.rm = T), 2))
+#apply(geih_escalada[,filtro], MARGIN = 2, 
+#     function(x) round(mean(x, na.rm = T), 2))
 
-apply(geih_escalada[,filtro], MARGIN = 2, 
-      function(x) round(sd(x, na.rm = T), 2))
+#apply(geih_escalada[,filtro], MARGIN = 2, 
+#     function(x) round(sd(x, na.rm = T), 2))
 
-head(geih_escalada)
+#head(geih_escalada)
+
 
 ##Transformaciones para resolver asimetrías
 
 # Primero seleccionamos las columnas numéricas
-filtro <- sapply(geih_sinna, is.numeric)
-sk <- sapply(geih_sinna[, filtro], skewness, na.rm = T)
+filtro <- sapply(geih_clean, is.numeric)
+sk <- sapply(geih_clean[, filtro], skewness, na.rm = T)
 
 # Vamos a buscar las variables con las mayores asimetrías sin importar la dirección
 sk_abs <- abs(sk)
@@ -278,19 +260,24 @@ sk_abs <- arrange(sk_abs, desc(sk_abs))
 # Las variables con mayor asimetría son:
 head(sk_abs)
 
-ggplot(geih_sinna, aes(x=ingtotes)) + geom_histogram(fill="darkblue", alpha=0.3)
-ggplot(geih_sinna, aes(x=log(ingtotes))) + geom_histogram(fill="darkblue", alpha=0.3)
+head(sk_abs)
+
+p_load(e1071)
+
+hist(geih_clean$ingtot)
 
 pload(e1071)
 
 # Construimos el vector de los ingresos y eliminamos los NAs 
-x <- geih_sinna$ingtotes[!is.na(geih$ingtotes)]
+x <- geih_clean$ingtot[!is.na(geih$ingtot)]
+x <- geih_clean$ingtot[geih_clean$ingtot!=0]
 sk_x <- skewness(x)
-print(paste("El valor de skewness para los ingresos totales imputados es", round(sk_x, 2)))
+print(paste("El valor de skewness para los ingresos totales es", round(sk_x, 2)))
 
-x <- log(geih_sinna$ingtotes[!is.na(geih$ingtotes)])
+x <- log(geih_clean$ingtot[!is.na(geih_clean$ingtot)])
+x <- geih_clean$ingtot[geih_clean$ingtot!=0]
 sk_x <- skewness(x)
-print(paste("El valor de skewness para los ingresos totales imputados es", round(sk_x, 2)))
+print(paste("El valor de skewness para los ingresos totales es", round(sk_x, 2)))
 
 # Vamos a aplicar diferentes transformaciones y a visualizar como cambia el skewness
 # Encontrar lambda óptimo
@@ -369,121 +356,90 @@ ggarrange(p1, p2, p3, p4, p5, nrow = 3, ncol = 2)
 (p1 | p2 | p3) /
   (p4 | p5)
 
-ggplot(geih_sinna, aes(x = totalHoursWorked, y = ingtotes)) +
-  geom_point(color = "darkblue", alpha = 0.5) +
-  theme_classic() +
-  scale_y_continuous(labels = scales::dollar) +
-  # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
-  labs(x = "Horas trabajadas", y = "Ingresos totales (Escala log)")
 
-ggplot(geih_sinna, aes(y = totalHoursWorked)) +
-  geom_boxplot(fill = "darkblue", alpha = 0.5) +
+##En búsqueda de valores atípicos se realizan gráficos de cajas y bigotes y análisis de correlaciones
+
+##Distribución horas trabajadas
+ggplot(geih_clean, aes(y = totalHoursWorked)) +
+  geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
   theme_classic() +
   labs(y = "Horas trabajadas") +
   scale_x_discrete( ) 
 
-ggplot(geih_sinna, aes(y = ingtotes)) +
-  geom_boxplot(fill = "darkblue", alpha = 0.5) +
+##Distribución ingresos
+ggplot(geih_clean, aes(y = ingtot)) +
+  geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
   theme_classic() +
   labs(y = "Ingresos totales") +
   scale_y_continuous(labels = scales::dollar) +
   scale_x_discrete( ) 
 
 ##Eliminamos una única observación que indica un ingreso total de $50 millones.
-geih_p=geih[geih_sinna$ingtotes<40000000,]
+geih_p=geih[geih$ingtotes<40000000,]
 
-ggplot(geih_p, aes(y = ingtotes)) +
-  geom_boxplot(fill = "darkblue", alpha = 0.5) +
+##Distribución experiencia
+ggplot(geih_clean, aes(y = p6426)) +
+  geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
   theme_classic() +
-  labs(y = "Ingresos totales") +
+  labs(y = "Años de Experiencia") +
   scale_y_continuous(labels = scales::dollar) +
   scale_x_discrete( ) 
+
 
 ##Estadísticas descriptivas, tablas y figuras
 
 #Variables de interés defindas: 
 
-#De acuerdo a las instrucciones del ejercicio se mantiene en la muestra las observaciones que correspondan a
-#Personas ocupadas de 18 años o mayores.
-geih_p=geih_p[geih_p$age>=18,]
-geih_p=geih_p[geih_p$ocu==1,]
-
-geih_sinna=geih_sinna[geih_sinna$age>=18,]
-geih_sinna=geih_sinna[geih_sinna$ocu==1,]
-
-
 ##Las variables que se considera pueden influir en el salario es si se encuentran en una zona urbana-rural,
 ##el sexo, el número de horas trabajadas, el nivel máximo de educación alcanzado, el oficio y la experiencia en el oficio actual
 ##(clase (urbano-rural), maxEducLevel (sim. P6210),  oficio, sex, totalHoursWorked, P6426 (experiencia en oficio actual))
 
-ggplot(geih_p, aes(x = totalHoursWorked, y = ingtotes)) +
-  geom_point(color = "darkblue", alpha = 0.5) +
-  theme_classic() +
-  scale_y_continuous(labels = scales::dollar) +
-  # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
-  labs(x = "Horas trabajadas", y = "Ingresos totales (Escala log)")
-
-ggplot(geih_p, aes(y = totalHoursWorked)) +
-  geom_boxplot(fill = "darkblue", alpha = 0.5) +
-  theme_classic() +
-  labs(y = "Horas trabajadas") +
-  scale_x_discrete( ) 
-
-ggplot(geih_p, aes(x = totalHoursWorked, y = ingtotes)) +
-  geom_point(color = "darkblue", alpha = 0.5) +
-  theme_classic() +
-  scale_y_continuous(labels = scales::dollar) +
-  # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
-  labs(x = "Horas trabajadas", y = "Ingresos totales (Escala log)")
-
-ggplot(geih_p, aes(y = totalHoursWorked)) +
-  geom_boxplot(fill = "darkblue", alpha = 0.5) +
-  theme_classic() +
-  labs(y = "Horas trabajadas") +
-  scale_x_discrete( ) 
-
+#Distribución de categóricas
+##Distribución de nivel educativo
 ggplot() +
-  geom_bar(data = geih_sinna, aes(x = p6210), 
-           fill = "darkblue", alpha = 0.5) +
+  geom_bar(data = geih_clean, aes(x = p6210), 
+           fill = "darkslategray3", alpha = 0.5) +
   labs(x = "Nivel educativo", y = "Frequencia") + 
   theme_classic()
 
-ggplot(geih_p, aes(x = p6426, y = ingtotes)) +
-  geom_point(color = "darkblue", alpha = 0.5) +
-  theme_classic() +
-  scale_y_continuous(labels = scales::dollar) +
-  # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
-  labs(x = "Experiencia en el oficio actual", y = "Ingresos totales (Escala log)")
-  
-  ggplot() +
-  geom_bar(data = geih_sinna, aes(x = sex), 
-           fill = "darkblue", alpha = 0.5) +
+ggplot() +
+  geom_bar(data = geih_clean, aes(x = maxEducLevel), 
+           fill = "darkslategray3", alpha = 0.5) +
+  labs(x = "Nivel Educativo", y = "Frequencia") + 
+  theme_classic()
+
+##Distribución por sexo
+ggplot() +
+  geom_bar(data = geih_clean, aes(x = sex), 
+           fill = "darkslategray3", alpha = 0.5) +
   labs(x = "Sexo", y = "Frequencia") + 
   theme_classic()
 
+##Distribución por zona urbana-rural
 ggplot() +
-  geom_bar(data = geih_sinna, aes(x = clase), 
-           fill = "darkblue", alpha = 0.5) +
+  geom_bar(data = geih_clean, aes(x = clase), 
+           fill = "darkslategray3", alpha = 0.5) +
   labs(x = "Zona", y = "Frequencia") + 
   theme_classic()
+
+##Correlación ingresos y experiencia
+ggplot(geih_clean, aes(x = p6426, y = ingtot)) +
+  geom_point(color = "darkslategray3", alpha = 0.5) +
+  theme_classic() +
+  scale_y_continuous(labels = scales::dollar) +
+  # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
+  labs(x = "Experiencia", y = "Ingresos totales (log)")
 
 ##Todas las observaciones se encuentran en zona urbana, por lo que no se tendrá en cuenta
-##Esta variable de interés en el modelo.
+##Esta variable es de interés en el modelo:
 
-ggplot() +
-  geom_bar(data = geih_p, aes(x = ocu), 
-           fill = "darkblue", alpha = 0.5) +
-  labs(x = "Zona", y = "Frequencia") + 
-  theme_classic()
-
-##La variable ocupación cuenta con una cantidad significativa de NAs, por lo que tampoco se tendrá en cuenta.
 #Tablas
 
 our_summary1 <-
   list("Ingreso Total" =
-         list("min"       = ~ min(ingtotes),
-              "max"       = ~ max(ingtotes),
-              "mean (sd)" = ~ qwraps2::mean_sd(ingtotes)),
+         list("min"       = ~ min(ingtot),
+              "max"       = ~ max(ingtot),
+              "mean (sd)" = ~ qwraps2::mean_sd(ingtot)),
        "Horas Trabajadas" =
          list("min"       = ~ min(totalHoursWorked),
               "median"    = ~ median(totalHoursWorked),
@@ -502,8 +458,13 @@ our_summary1 <-
               "Seis"  = ~ qwraps2::n_perc0(p6210 == 6))
   )
 
-by_sex <- summary_table(dplyr::group_by(geih_p, sex), our_summary1)
+tabladescrip<- summary_table(geih_clean, our_summary1)
+tabladescrip
+
+by_sex <- summary_table(dplyr::group_by(geih_clean, sex), our_summary1)
 by_sex
+
+vartable <- st(geih_p, vars = c('ingtotes','totalHoursWorked', 'p6426'))
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%    Age-earnings profile 		          %

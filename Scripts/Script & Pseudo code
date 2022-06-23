@@ -385,6 +385,13 @@ ggplot(geih_clean, aes(y = p6426)) +
   scale_y_continuous(labels = scales::dollar) +
   scale_x_discrete( ) 
 
+##Distribución edad
+ggplot(geih_clean, aes(y = age)) +
+  geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
+  theme_classic() +
+  labs(y = "Edad") +
+  scale_y_continuous(labels = scales::dollar) +
+  scale_x_discrete( ) 
 
 ##Estadísticas descriptivas, tablas y figuras
 
@@ -421,6 +428,8 @@ ggplot() +
            fill = "darkslategray3", alpha = 0.5) +
   labs(x = "Zona", y = "Frequencia") + 
   theme_classic()
+  
+##Todas las observaciones se encuentran en zona urbana, por lo que no se tendrá en cuenta para el análisis de regresión
 
 ##Correlación ingresos y experiencia
 ggplot(geih_clean, aes(x = p6426, y = ingtot)) +
@@ -430,8 +439,13 @@ ggplot(geih_clean, aes(x = p6426, y = ingtot)) +
   # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
   labs(x = "Experiencia", y = "Ingresos totales (log)")
 
-##Todas las observaciones se encuentran en zona urbana, por lo que no se tendrá en cuenta
-##Esta variable es de interés en el modelo:
+##Correlación ingresos y edad
+ggplot(geih_clean, aes(x = age, y = ingtot)) +
+  geom_point(color = "darkslategray3", alpha = 0.5) +
+  theme_classic() +
+  scale_y_continuous(labels = scales::dollar) +
+  # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
+  labs(x = "Edad", y = "Ingresos totales (log)")
 
 #Tablas
 

@@ -360,25 +360,24 @@ ggarrange(p1, p2, p3, p4, p5, nrow = 3, ncol = 2)
 ##En búsqueda de valores atípicos se realizan gráficos de cajas y bigotes y análisis de correlaciones
 
 ##Distribución horas trabajadas
-ggplot(geih_clean, aes(y = totalHoursWorked)) +
+d1 <- ggplot(geih_clean, aes(y = totalHoursWorked)) +
   geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
   theme_classic() +
   labs(y = "Horas trabajadas") +
   scale_x_discrete( ) 
 
 ##Distribución ingresos
-ggplot(geih_clean, aes(y = ingtot)) +
+d2 <- ggplot(geih_clean, aes(y = ingtot)) +
   geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
   theme_classic() +
   labs(y = "Ingresos totales") +
   scale_y_continuous(labels = scales::dollar) +
   scale_x_discrete( ) 
-
 ##Eliminamos una única observación que indica un ingreso total de $50 millones.
-geih_p=geih[geih$ingtotes<40000000,]
+geih_clean <- geih_clean=geih[geih$ingtotes<40000000,]
 
 ##Distribución experiencia
-ggplot(geih_clean, aes(y = p6426)) +
+d3 <- ggplot(geih_clean, aes(y = p6426)) +
   geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
   theme_classic() +
   labs(y = "Años de Experiencia") +
@@ -386,12 +385,16 @@ ggplot(geih_clean, aes(y = p6426)) +
   scale_x_discrete( ) 
 
 ##Distribución edad
-ggplot(geih_clean, aes(y = age)) +
+d4 <- ggplot(geih_clean, aes(y = age)) +
   geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
   theme_classic() +
   labs(y = "Edad") +
   scale_y_continuous(labels = scales::dollar) +
   scale_x_discrete( ) 
+
+ggarrange(d1, d2, d3, d4, d5, nrow = 3, ncol = 2)
+(d1 | d2) /
+  (d3 | d4)
 
 ##Estadísticas descriptivas, tablas y figuras
 
@@ -403,36 +406,43 @@ ggplot(geih_clean, aes(y = age)) +
 
 #Distribución de categóricas
 ##Distribución de nivel educativo
-ggplot() +
+g1 <- ggplot() +
   geom_bar(data = geih_clean, aes(x = p6210), 
            fill = "darkslategray3", alpha = 0.5) +
   labs(x = "Nivel educativo", y = "Frequencia") + 
   theme_classic()
 
-ggplot() +
+g2 <- ggplot() +
   geom_bar(data = geih_clean, aes(x = maxEducLevel), 
            fill = "darkslategray3", alpha = 0.5) +
-  labs(x = "Nivel Educativo", y = "Frequencia") + 
+  labs(x = "Nivel Educativo Máximo", y = "Frequencia") + 
   theme_classic()
 
 ##Distribución por sexo
-ggplot() +
+g3 <- ggplot() +
   geom_bar(data = geih_clean, aes(x = sex), 
            fill = "darkslategray3", alpha = 0.5) +
   labs(x = "Sexo", y = "Frequencia") + 
   theme_classic()
-
+(g1 | g2) /
+  (g3)
 ##Distribución por zona urbana-rural
 ggplot() +
   geom_bar(data = geih_clean, aes(x = clase), 
            fill = "darkslategray3", alpha = 0.5) +
   labs(x = "Zona", y = "Frequencia") + 
   theme_classic()
-  
-##Todas las observaciones se encuentran en zona urbana, por lo que no se tendrá en cuenta para el análisis de regresión
+##Todas las observaciones se encuentran en zona urbana, por lo que no se tendrá en cuenta
 
+##Correlación ingresos y horas trabajadas
+cor1 <- ggplot(geih_clean, aes(x = totalHoursWorked, y = ingtot)) +
+  geom_point(color = "darkslategray3", alpha = 0.5) +
+  theme_classic() +
+  scale_y_continuous(labels = scales::dollar) +
+  # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
+  labs(x = "Horas Trabajadas", y = "Ingresos totales (log)")
 ##Correlación ingresos y experiencia
-ggplot(geih_clean, aes(x = p6426, y = ingtot)) +
+cor2 <- ggplot(geih_clean, aes(x = p6426, y = ingtot)) +
   geom_point(color = "darkslategray3", alpha = 0.5) +
   theme_classic() +
   scale_y_continuous(labels = scales::dollar) +
@@ -440,45 +450,48 @@ ggplot(geih_clean, aes(x = p6426, y = ingtot)) +
   labs(x = "Experiencia", y = "Ingresos totales (log)")
 
 ##Correlación ingresos y edad
-ggplot(geih_clean, aes(x = age, y = ingtot)) +
+cor3 <- ggplot(geih_clean, aes(x = age, y = ingtot)) +
   geom_point(color = "darkslategray3", alpha = 0.5) +
   theme_classic() +
   scale_y_continuous(labels = scales::dollar) +
   # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
   labs(x = "Edad", y = "Ingresos totales (log)")
 
+(cor1 | cor2) /
+  (cor3)
+
 #Tablas
+##Se etiquetarán las variables para mayor claridad
+geih_clean = apply_labels(geih_clean,
+                      ingtot = "Ingreso Total",
+                      totalHoursWorked = "Horas trabajadas",
+                      age = "Edad",
+                      p6426 = "Experiencia",
+                      p6210 = "Nivel Educativo",
+                      sex = "Sexo")
+#Tablas descriptivas
 
-our_summary1 <-
-  list("Ingreso Total" =
-         list("min"       = ~ min(ingtot),
-              "max"       = ~ max(ingtot),
-              "mean (sd)" = ~ qwraps2::mean_sd(ingtot)),
-       "Horas Trabajadas" =
-         list("min"       = ~ min(totalHoursWorked),
-              "median"    = ~ median(totalHoursWorked),
-              "max"       = ~ max(totalHoursWorked),
-              "mean (sd)" = ~ qwraps2::mean_sd(totalHoursWorked)),
-       "Experiencia" =
-         list("min"       = ~ min(p6426),
-              "max"       = ~ max(p6426),
-              "mean (sd)" = ~ qwraps2::mean_sd(p6426)),
-       "Nivel Educativo" =
-         list("Uno" = ~ qwraps2::n_perc0(p6210 == 1),
-              "Dos"  = ~ qwraps2::n_perc0(p6210 == 2),
-              "Tres"  = ~ qwraps2::n_perc0(p6210 == 3),
-              "Cuatro" = ~ qwraps2::n_perc0(p6210== 4),
-              "Cinco"  = ~ qwraps2::n_perc0(p6210 == 5),
-              "Seis"  = ~ qwraps2::n_perc0(p6210 == 6))
-  )
+vartable <- st(geih_clean, vars = c('ingtot','totalHoursWorked', 'p6426', 'age'), labels = c("Ingresos Totales", "Horas trabajadas", "Experiencia", "Edad"))
 
-tabladescrip<- summary_table(geih_clean, our_summary1)
-tabladescrip
+sumar1 <- describe(geih_clean[ , c('ingtot', 'age', 'totalHoursWorked', 'p6426')],fast=TRUE)
 
-by_sex <- summary_table(dplyr::group_by(geih_clean, sex), our_summary1)
-by_sex
+stargazer(geih_clean[c('ingtot', 'age', 'totalHoursWorked', 'p6426')], type = "text", 
+                             digits=2, median = TRUE, iqr = TRUE,
+                             title="Descriptive statistics",
+                             covariate.labels=c("Ingreso total","Edad","Horas trabajadas","p6426"),out="table1.txt")
 
-vartable <- st(geih_p, vars = c('ingtotes','totalHoursWorked', 'p6426'))
+##Correlaciones
+# Primero seleccionamos las columnas numéricas
+#Se obtienen las correlaciones
+correla <- geih_clean[c('ingtot', 'age', 'totalHoursWorked', 'p6426')]
+mcor <- round(cor(correla[, unlist(lapply(correla, is.numeric))]),2)
+#Se mantiene toda la tabla
+upper<-mcor
+upper[upper.tri(mcor)]<-""
+upper<-as.data.frame(upper)
+
+corrplot(cor(correla[, unlist(lapply(correla, is.numeric))]))
+
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%    Age-earnings profile 		          %

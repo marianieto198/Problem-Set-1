@@ -44,23 +44,23 @@ library(ggpubr)
 #3. Se define la base vacía o la base inicial que será llenada por la información scrapeada de los url
 Pagina1 <- read_html("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_1.html") %>%
                     html_table()  
-class(Pagina1)
+class(Pagina1) #La variable es tipo List y toca volverla Data Frame
 
-Pagina1 <- as.data.frame(Pagina1)
-df <- Pagina1
+Pagina1 <- as.data.frame(Pagina1) Volvemos la lista un Data Frame
+df <- Pagina1 #Convertimos la pagina 1 en el DF que se usará para el taller
 
 #3.1.Para cada chunk de información se extrae un temporal en donde se irá almacenando la información de cada chunk. 
 #Para este paso se utiliza el comando “for” junto con el comando “paste0” para concatenar los diferentes url en un único elemento. 
 for (i in 2:10) {
-   url <- paste0("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_",i,".html") 
-  chunk_i <- read_html(url)  %>%
-    html_table()  
-  chunk_i <- as.data.frame(chunk_i)
+   url <- paste0("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_",i,".html") #Vamos iterando la pagina con i
+  chunk_i <- read_html(url)  %>% 
+    html_table()  # Se crea la lista del chunk
+  chunk_i <- as.data.frame(chunk_i) #se vuelve data frame el chunk
 #3.2.Se utiliza el comando rbind para pegar las filas de información almacenadas en cada archivo temporal y unificarlas en un único elemento.
  df <-  rbind(df, chunk_i) 
 }
 
-geih <- df
+geih <- df # le cambiamos el nombre
 ###Otra opción es la siguiente:
 
 #1.
@@ -118,18 +118,30 @@ geih <- geih %>%
     .funs = factor)
 
 str(geih)
+summary (geih) # se puede ver que hay un gran número de observaciones vacias
 
-##Antes de realizar las descriptivas es necesario analizar los missing values para identificar el comportamiento de la muestra ya delimitada
-summary(geih[, c("sex","age")])
+#Se elimina la primera variable que no es necesaria
+geih <- geih %>%
+      select(-Var.1)
+
+#Ahora se necesita hacer el filtro de la base de datos por personas ocupadas, que vivan en Bogotá y que sean mayores de 18 años
+geih <- geih %>%
+      filter(ocu == 1,
+             dominio == "BOGOTA",
+             age > 18)
+
+dim(geih) # La base pasó de 32177 observaciones a 16397 observaciones
+summary(df) #se puede observar que aunque bajaron los NAs sigue habiendo una presencia significativa en muchas variables
+
 
 ##Tratamiento de missing values
 
-cantidad_na <- sapply(geih, function(x) sum(is.na(x)))
-cantidad_na <- data.frame(cantidad_na)
-porcentaje_na <- cantidad_na/nrow(geih)
+cantidad_na <- sapply(geih, function(x) sum(is.na(x))) #Una función que me suma el número de NAs por variable
+cantidad_na <- data.frame(cantidad_na) #Lo convierto en Data Frame
+porcentaje_na <- cantidad_na/nrow(geih) #Le saco el porcentaje de Missing values a cada variable
 
 # Porcentaje de observaciones faltantes. 
-porcentaje <- mean(porcentaje_na[,1])
+porcentaje <- mean(porcentaje_na[,1]) #El 45.21% de las variables tiene NAs
 print(paste0("En promedio el ", round(porcentaje*100, 2), "% de las entradas están vacías"))
 
 ##Ordenamos de mayor a menor
@@ -140,14 +152,17 @@ porcentaje_na <- rownames_to_column(porcentaje_na, "variable")
 # Quitamos las variables que no tienen NAs
 filtro <- porcentaje_na$cantidad_na == 0
 variables_sin_na <- porcentaje_na[filtro, "variable"]
+str_count(variables_sin_na) #Hay 58 variables sin NA
 variables_sin_na <- paste(variables_sin_na, collapse = ", ")
 print(paste("Las variables sin NAs son:", variables_sin_na))
 
-porcentaje_na <- porcentaje_na[!filtro,]
+porcentaje_na <- porcentaje_na[!filtro,] #Quedan solo 119 variables con NAs
 
-orden <- porcentaje_na$variable[length(porcentaje_na$variable):1]
+orden <- porcentaje_na$variable[length(porcentaje_na$variable):1] #Se vuelven caracteres
 porcentaje_na$variable <- factor(porcentaje_na$variable,
-                                 levels = orden)
+                                 levels = orden) #Se utilizan como factores para poder graficar
+
+str(porcentaje_na) # Se revisa el tipo de variables
 
 # Como son tantas variables vamos a hacer 3 gráficas
 ggplot(porcentaje_na[1:50,], 
@@ -180,29 +195,56 @@ ggplot(porcentaje_na[101:nrow(porcentaje_na),],
   labs(x = "Porcentaje de NAs", y = "Variables") +
   scale_x_continuous(labels = scales::percent, limits = c(0, 1))
 
+Hay un salto de 36% de NAs de la variable ie a 10.6% de la variable  y_total_m 
+
 #Si la cantidad de missing values es superior al 5% no se pueden imputar los datos (crearlos a partir de la media o la moda)
 ##Se eliminan las variables que tienen más del 5% de NAs
 filtro2 <- porcentaje_na$cantidad_na > 0.05
 variables_eliminadas <- porcentaje_na$variable[filtro2]
 geih_sinna <- geih %>%
   select(-variables_eliminadas) 
+k0 <- ncol(geih)
+k1 <- ncol(geih_sinna)
+print(paste("Se eliminarion", k0-k1, "variables. Ahora la base tiene", k1, "columnas."))
+#Ahora solo tenemos 62 variables
 
-tail(cantidad_na)
-moda_p6210 <- which(table(geih_sinna$p6210) == max(table(geih_sinna$p6210)))
+porcentaje_na %>%
+              filter(cantidad_na <= 0.05)
+#Nos quedan 4 variables con NAs: impa, p7070, isa, maxEducLevel
+ 
+#Como tres variables son continuas se reemplaza por la mediana, para que queden en el percentil 50% 
+geih_sinna <- geih_sinna %>%
+            mutate(impa = ifelse(is.na(impa), median(impa, na.rm = T), impa), #Mediana sin tener en cuenta los NAs
+                   p7070 = ifelse(is.na(p7070), median(p7070, na.rm = T), p7070),
+                   isa = ifelse(is.na(isa), median(isa, na.rm = T), isa))
 
-filtro2 <- is.na(geih_sinna$p6210)
-geih_sinna$p6210[filtro2] <- moda_p6210
-table(geih_sinna$p6210)
 
-geih_sinna %>%
-  is.na()%>%
-  sum()
+sum(is.na(geih_sinna$impa)) #Reviso
+sum(is.na(geih_sinna$p7070)) #Reviso
+sum(is.na(geih_sinna$isa)) #Reviso
+
+#Para MaxLevelEduc toca sacar la moda y eso lo hacemos mirando su plot y después reemplazando
+ggplot(geih_sinna, aes(x = maxEducLevel)) + geom_bar()
+
+#La moda es la categoría 7
+moda_MaxEduc <- which(table(geih_sinna$maxEducLevel) == max(table(geih_sinna$maxEducLevel))) #Guardo el mayor valor
+filtro2 <- is.na(geih_sinna$maxEducLevel) #filtro solo los NAs
+geih_sinna$maxEducLevel[filtro2] <- moda_MaxEduc #Reemplazo los NAs por la moda
+table(geih_sinna$maxEducLevel) #Reviso
+
+sum(is.na(geih_sinna$maxEducLevel)) #Reviso
+
+geih_sinna %>% #Se revisa que todo el DF esté sin NAs
+          is.na() %>%
+          sum()
+
+
 
 ##Normalizar los datos 
 
 # Primero seleccionamos las columnas numéricas
-filtro <- sapply(geih, is.numeric)
-geih_escalada <- geih
+filtro <- sapply(geih_sinna, is.numeric)
+geih_escalada <- geih_sinna
 geih_escalada[,filtro] <- scale(geih[,filtro])
 
 # Podemos obtener las medias y las desviaciones con las que se hizo la transformación
@@ -224,8 +266,8 @@ head(geih_escalada)
 ##Transformaciones para resolver asimetrías
 
 # Primero seleccionamos las columnas numéricas
-filtro <- sapply(geih, is.numeric)
-sk <- sapply(geih[, filtro], skewness, na.rm = T)
+filtro <- sapply(geih_sinna, is.numeric)
+sk <- sapply(geih_sinna[, filtro], skewness, na.rm = T)
 
 # Vamos a buscar las variables con las mayores asimetrías sin importar la dirección
 sk_abs <- abs(sk)
@@ -236,17 +278,17 @@ sk_abs <- arrange(sk_abs, desc(sk_abs))
 # Las variables con mayor asimetría son:
 head(sk_abs)
 
-ggplot(geih, aes(x=ingtotes)) + geom_histogram(fill="darkblue", alpha=0.3)
-ggplot(geih, aes(x=log(ingtotes))) + geom_histogram(fill="darkblue", alpha=0.3)
+ggplot(geih_sinna, aes(x=ingtotes)) + geom_histogram(fill="darkblue", alpha=0.3)
+ggplot(geih_sinna, aes(x=log(ingtotes))) + geom_histogram(fill="darkblue", alpha=0.3)
 
 pload(e1071)
 
 # Construimos el vector de los ingresos y eliminamos los NAs 
-x <- geih$ingtotes[!is.na(geih$ingtotes)]
+x <- geih_sinna$ingtotes[!is.na(geih$ingtotes)]
 sk_x <- skewness(x)
 print(paste("El valor de skewness para los ingresos totales imputados es", round(sk_x, 2)))
 
-x <- log(geih$ingtotes[!is.na(geih$ingtotes)])
+x <- log(geih_sinna$ingtotes[!is.na(geih$ingtotes)])
 sk_x <- skewness(x)
 print(paste("El valor de skewness para los ingresos totales imputados es", round(sk_x, 2)))
 
@@ -327,20 +369,20 @@ ggarrange(p1, p2, p3, p4, p5, nrow = 3, ncol = 2)
 (p1 | p2 | p3) /
   (p4 | p5)
 
-ggplot(geih, aes(x = totalHoursWorked, y = ingtotes)) +
+ggplot(geih_sinna, aes(x = totalHoursWorked, y = ingtotes)) +
   geom_point(color = "darkblue", alpha = 0.5) +
   theme_classic() +
   scale_y_continuous(labels = scales::dollar) +
   # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
   labs(x = "Horas trabajadas", y = "Ingresos totales (Escala log)")
 
-ggplot(geih, aes(y = totalHoursWorked)) +
+ggplot(geih_sinna, aes(y = totalHoursWorked)) +
   geom_boxplot(fill = "darkblue", alpha = 0.5) +
   theme_classic() +
   labs(y = "Horas trabajadas") +
   scale_x_discrete( ) 
 
-ggplot(geih, aes(y = ingtotes)) +
+ggplot(geih_sinna, aes(y = ingtotes)) +
   geom_boxplot(fill = "darkblue", alpha = 0.5) +
   theme_classic() +
   labs(y = "Ingresos totales") +
@@ -348,7 +390,7 @@ ggplot(geih, aes(y = ingtotes)) +
   scale_x_discrete( ) 
 
 ##Eliminamos una única observación que indica un ingreso total de $50 millones.
-geih_p=geih[geih$ingtotes<40000000,]
+geih_p=geih[geih_sinna$ingtotes<40000000,]
 
 ggplot(geih_p, aes(y = ingtotes)) +
   geom_boxplot(fill = "darkblue", alpha = 0.5) +

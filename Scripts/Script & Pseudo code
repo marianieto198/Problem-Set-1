@@ -577,8 +577,9 @@ peak_age <- (beta2/(-beta3*2))
 peak_age
 
 #-----------Punto 4 GAP Earnings GAP-------------------
+#-----------Punto 4-------------------
 #Base a utilizar en este punto
-geih_punto4 <- geih_clean %>%
+geih_clean <- geih_sinna %>%
                 select(ingtot, sex, age)
 
 #Transformar el ingreso en logaritmo
@@ -611,10 +612,8 @@ M_p4 <- geih_punto4 %>%
 M_p4 #No está tan clara la correlación
 
 #Modelo lineal
-#Estimate the unconditional earnings gap
-
+#Estimar el modelo de gap
 ModeloGap <- lm(logIng ~ female, data = geih_punto4)
-
 
 geih_punto4 %>% ggplot(aes(x = logIng)) + geom_histogram()
 
@@ -643,9 +642,7 @@ ggplot(geih_punto4, aes(x= logIng, fill = female)) + geom_histogram(position = "
 ggplot(geih_punto4, aes(x= fitValues, fill = female)) + geom_histogram(position = "identity", alpha = 0.5)
 
 
-#Estimate and plot the predicted age-earnings profile by gender. Do men and
-#women in Bogotá have the same intercept and slopes?
-
+#Modelo con edad y genero
 geih_punto4 <- geih_punto4 %>%
                 mutate(age2 = age^2)
 
@@ -661,29 +658,25 @@ ggplot(geih_punto4, aes(x = age, y = logIng, colour = female)) + geom_point(alph
 #Y empieza a decrecer
 ggplot(geih_punto4, aes(x = age, y = ModeloGapAge$fitted.values, colour = female)) + geom_point(alpha = 0.15) + geom_smooth()
 
-#Modelo tenienfo en cuenta la interacción
+#Ahora se realiza la regresion con la interacción
+geih_punto4$numfem <- as.numeric(geih_punto4$female)
+geih_punto4$numfem <- ifelse(geih_punto4$numfem == 2, 1, 0)
+
+geih_punto4$agefem <- geih_punto4$numfem*geih_punto4$age
+
 #Los coeficientes cambian, hay un mayor impacto de género. EL R2 aumenta a 4,24%
 ModeloGapAgeInt <- lm(logIng ~ female + age + age2 + agefem, data = geih_punto4)
 coef(ModeloGapAgeInt)
 summary(ModeloGapAgeInt)
 
-#Plot con los Y estimados. Tienen el mismo intercepto, y la pendiente se parece, sin embargo, los hombres crecen más rápido y llegan
-#a un punto máximo con una edad mucho mayor que las mujeres. Según la gráfica
+#Plot con los Y estimados. No hay intercepción, aunque muestran la misma pendiente a lo largo del gráfico. Llegan a un punto máximo
+#Y empieza a decrecer
 ggplot(geih_punto4, aes(x = age, y = ModeloGapAgeInt$fitted.values, colour = female)) + geom_point(alpha = 0.15) + geom_smooth()
-
-
 
 
 #Peak Age con Bootstrap
 
-set.seed(1111)
-ControlEntrenamiento <- trainControl(method = "boot", number = 1000) #Control de train para hacer el Bootstrapping
-ModelosBoot_AgeCAP <- train(logIng ~ female + age + age2,
-                            data = geih_punto4,
-                            method = "lm",
-                            trControl = ControlEntrenamiento) #Correr el modelo con 1000 interacciones para reducir los errores estandar
 
-summary(ModelosBoot_AgeCAP$finalModel$coefficients) #Los errores estándar no se redujeron, es necesario intentar de otra forma
 
 p_load(boot)
 
@@ -694,19 +687,17 @@ model_coef(geih_punto4, 1:16138) #Probar la función
 
 ModeloBoot_AgeCAP2 <- boot(geih_punto4, model_coef, R=1000) #Correr el boot. Se puede ver que los errores estándar mejoraran con el boot
 
+BootSE <- as.data.frame(ModeloBoot_AgeCAP2$t)
 
 #Calculamos los intervalos de confianza para cada variable
-lowerlimitFem <- ModelosBoot_AgeCAP$finalModel$coefficients[2] - (1.96*0.01356242)
-upperlimitFem <- ModelosBoot_AgeCAP$finalModel$coefficients[2] + (1.96*0.01356242) 
-ConfidenceIntervalFemale <- c(lowerlimitFem, upperlimitFem)
+hist(BootSE$V2)
+IC_FMod1 <- quantile(BootSE$V2,c(0.025,0.975))
 
-lowerlimitAge <- ModelosBoot_AgeCAP$finalModel$coefficients[3] - (1.96*0.003509626)
-upperlimitAge <- ModelosBoot_AgeCAP$finalModel$coefficients[3] + (1.96*0.003509626)
-ConfidenceIntervalAge <- c(lowerlimitAge, upperlimitAge)
+hist(BootSE$V3)
+IC_AgeMod1 <- quantile(BootSE$V3,c(0.025,0.975))
 
-lowerlimitAge2 <- ModelosBoot_AgeCAP$finalModel$coefficients[4] - (1.96*0.00004273566)
-upperlimitAge2 <- ModelosBoot_AgeCAP$finalModel$coefficients[4] + (1.96*0.00004273566)
-ConfidenceIntervalAge2 <- c(lowerlimitAge2, upperlimitAge2)
+hist(BootSE$V4)
+IC_Age2Mod1 <- quantile(BootSE$V4,c(0.025,0.975))
 
 #Ninguna de las variables tiene overlap en los intervalos
 
@@ -716,54 +707,94 @@ max(ModeloGapAge$fitted.values)
 geih_punto4$fitValuesGAPAGE <- ModelosBoot_AgeCAP$finalModel$fitted.values
 
 #Peakage en la gráfica
-peaked_age <- geih_punto4 %>% 
-  group_by(age, female) %>%
-  summarise(max(fitValuesGAPAGE)) %>%
-  arrange(female)         
+        
 #Para los dos géneros la edad de pico son los 44 años
 
 peaked_age <- ModelosBoot_AgeCAP$finalModel$coefficients[3]/(-ModelosBoot_AgeCAP$finalModel$coefficients[4]*2)
 
-#Ahora se realiza la regresion con la interacción
-geih_punto4$numfem <- as.numeric(geih_punto4$female)
-geih_punto4$numfem <- ifelse(geih_punto4$numfem == 2, 1, 0)
 
-geih_punto4$agefem <- geih_punto4$numfem*geih_punto4$age
+#Bootstrap para interacción
 
-#Bootstrap Con modelo de Interaccion
-
-model_coef <- function(data, index){
+model_coef2 <- function(data, index){
   coef(lm(logIng ~ female + age + age2 + agefem, data = data, subset = index)) #Crear la función para calcular los errores estándar
 }
-model_coef(geih_punto4, 1:16138) #Probar la función
+model_coef2(geih_punto4, 1:16138) #Probar la función
 
-ModeloBoot_AgeCAP2 <- boot(geih_punto4, model_coef, R=1000) #Correr el boot. Se puede ver que los errores estándar mejoraran con el boot
-summary(ModeloBoot_AgeCAP2)
+ModeloBoot_AgeFEM <- boot(geih_punto4, model_coef2, R=1000) #Correr el boot. Se puede ver que los errores estándar mejoraran con el boot
+summary(ModeloBoot_AgeFEM)
 
 
 #Calculamos los intervalos de confianza para cada variable
-lowerlimitFemI <- ModeloBoot_AgeCAP2$t0[2] - (1.96*0.0439099056)
-upperlimitFemI <- ModeloBoot_AgeCAP2$t0[2] + (1.96*0.0439099056) 
-ConfidenceIntervalFemaleI <- c(lowerlimitFemI, upperlimitFemI)
+BootSEFAGE <- as.data.frame(ModeloBoot_AgeFEM$t)
 
-lowerlimitAgeI <- ModeloBoot_AgeCAP2$t0[3] - (1.96*0.0036893856)
-upperlimitAgeI <- ModeloBoot_AgeCAP2$t0[3] + (1.96*0.0036893856)
-ConfidenceIntervalAgeI <- c(lowerlimitAgeI, upperlimitAgeI)
+#Calculamos los intervalos de confianza para cada variable
+hist(BootSEFAGE$V2)
+IC_FMod2 <- quantile(BootSEFAGE$V2,c(0.025,0.975))
 
-lowerlimitAge2I <- ModeloBoot_AgeCAP2$t0[4] - (1.96*0.0000446136)
-upperlimitAge2I <- ModeloBoot_AgeCAP2$t0[4] + (1.96*0.0000446136)
-ConfidenceIntervalAge2I <- c(lowerlimitAge2I, upperlimitAge2I)
+hist(BootSEFAGE$V3)
+IC_AgeMod2 <- quantile(BootSEFAGE$V3,c(0.025,0.975))
 
-lowerlimitAgeFem <- ModeloBoot_AgeCAP2$t0[5] - (1.96*0.0011546835)
-upperlimitAgeFem <- ModeloBoot_AgeCAP2$t0[5] + (1.96*0.0011546835)
-ConfidenceIntervalAgeFem <- c(lowerlimitAgeFem, upperlimitAgeFem)
+hist(BootSEFAGE$V4)
+IC_Age2Mod2 <- quantile(BootSEFAGE$V4,c(0.025,0.975))
+
+hist(BootSEFAGE$V5)
+IC_AgeFemMod2 <- quantile(BootSEFAGE$V5,c(0.025,0.975))
+
 
 #peak age
-PeakAgeMujer <- (ModeloBoot_AgeCAP2$t0[3] + ModeloBoot_AgeCAP2$t0[5])/(-2*ModeloBoot_AgeCAP2$t0[4])
+PeakAgeMujer <- (ModeloBoot_AgeFEM$t0[3] + ModeloBoot_AgeFEM$t0[5])/(-2*ModeloBoot_AgeFEM$t0[4])
 #Las mujeres tienen su cúspide salarial a los 39.31 años
 
-PeakAgeHombre <- ModeloBoot_AgeCAP2$t0[3]/(-2*ModeloBoot_AgeCAP2$t0[4])
+PeakAgeHombre <- ModeloBoot_AgeFEM$t0[3]/(-2*ModeloBoot_AgeFEM$t0[4])
 #Los hombres, por su parte tienen su cúspide salarial a los 48.25 años
 
 
-#Equal pay for equal job
+
+
+#--------------Punto 5----------------------------------------------
+
+#a. Split the sample
+
+#Incluir variables de los modelos anteriores
+geih_clean$logIng <- log(geih_sinna$ingtot)
+geih_clean$age2 <- (geih_sinna$age)^2
+geih_clean$female <- ifelse(geih_sinna$sex == "0",1,0)
+geih_clean$agefem <- geih_sinna$age*geih_sinna$female
+
+#Separar la muestra:
+set.seed(10102) #Sembrar la semilla para aleatorizar la muestra
+#Dividir la muestra en 70% para entrenar y 30% para hacer el testeo
+index <-  round(nrow(geih_clean)*0.3,digits=0)
+#Muestra aleatorizada del df y mantener el número de observaciones del indice
+test.indices <- sample(1:nrow(geih_clean), index)
+# set de entrenamiento
+geih.train<-geih_clean[-test.indices,] 
+#30% set de testeo
+geih.test<-geih_clean[test.indices,] 
+#Seleccionar el set de entrenamiento en variables independientes y dependientes
+YTrain <- geih.train$ingtot
+XTrain <- geih.train %>% select(-ingtot)
+#Seleccionar el set de testeo en variables independientes y dependientes
+YTest <- geih.test$Diagnosis
+XTest <- geih.test %>% select(-ingtot)
+
+#Regresion de solo el intercepto
+Modelobase <- lm(ingtot ~ 1, data = geih.train)
+stargazer(Modelobase, type ="text")
+mean(geih.train$ingtot)
+
+#El intercepto es la media de los ingresos totales de las personas
+#Ahora estimamos nuestros modelos anteriores
+#Modelo Edad
+ModeloEdad <- lm(ingtot ~ age + age2, data = geih.train)
+
+#Modelo GAP y edad
+#Filtramos los logaritmos mayores a 0
+geih.train2 <- geih.train %>%
+                filter(logIng > 0)
+
+ModeloFemale <- lm(logIng ~ female, data = geih.train2)
+ModeloAgeGAP <- lm(logIng ~ female + age + age2 + agefem, data = geih.train2)
+
+stargazer(Modelobase, ModeloEdad, ModeloFemale, ModeloAgeGAP, type = "text")
+

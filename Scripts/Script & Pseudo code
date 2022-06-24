@@ -575,3 +575,195 @@ funcion <- expression(beta1+beta2*x+beta3*x^2)
 derivada <- D(funcion,'x')
 peak_age <- (beta2/(-beta3*2))
 peak_age
+
+#-----------Punto 4 GAP Earnings GAP-------------------
+#Base a utilizar en este punto
+geih_punto4 <- geih_clean %>%
+                select(ingtot, sex, age)
+
+#Transformar el ingreso en logaritmo
+geih_punto4 <- geih_punto4 %>%
+                mutate(logIng = log(ingtot))
+
+geih_punto4 <- geih_punto4 %>%
+  filter(logIng > 0)
+
+#Mirar las proporciones
+table(geih_punto4$sex)
+
+
+#Los 1 son hombres, hay que cambiar esto para hacer nuestro modelo
+geih_punto4 <- geih_punto4 %>%
+  mutate(female = ifelse(sex == "0", 1, 0))
+
+geih_punto4 <- geih_punto4 %>%
+  mutate(female = as.factor(female))
+
+table(geih_punto4$female)
+
+str(geih_punto4)
+summary(geih_punto4)
+
+#Correlación
+M_p4 <- geih_punto4 %>%
+          select(-sex) %>%
+          cor()
+M_p4 #No está tan clara la correlación
+
+#Modelo lineal
+#Estimate the unconditional earnings gap
+
+ModeloGap <- lm(logIng ~ female, data = geih_punto4)
+
+
+geih_punto4 %>% ggplot(aes(x = logIng)) + geom_histogram()
+
+summary(ModeloGap)
+
+#El modelo muestra que la variable independiente es significativa y muestra que al ser mujer se reduce el ingreso en en un 19.6% Sin embargo,
+#el R2 es solamente del 1.2%, lo que significa que la variable de género solo explica un 1.2% la varianza del modelo.
+stargazer(ModeloGap, type = "text")
+
+
+GapPredict <- predict(ModeloGap)
+
+#Se incluyen los y estimados para comprarar el modelo
+geih_punto4 <- geih_punto4 %>%
+                mutate(fitValues = ModeloGap$fitted.values)
+
+#Solo hay dos valores para los y estimados: uno  para mujer (13.97) y otro para hombre (14.07)
+summary(geih_punto4)
+exp(max(geih_punto4$fitValues))
+exp(min(geih_punto4$fitValues))
+
+#Analizamos algunas gráficas
+ggplot(geih_punto4, aes(x = logIng, y = fitValues, colour = female)) + geom_point()          
+ggplot(geih_punto4, aes(x = fitValues, y = logIng, colour = female)) + geom_point()
+ggplot(geih_punto4, aes(x= logIng, fill = female)) + geom_histogram(position = "identity", alpha = 0.5)
+ggplot(geih_punto4, aes(x= fitValues, fill = female)) + geom_histogram(position = "identity", alpha = 0.5)
+
+
+#Estimate and plot the predicted age-earnings profile by gender. Do men and
+#women in Bogotá have the same intercept and slopes?
+
+geih_punto4 <- geih_punto4 %>%
+                mutate(age2 = age^2)
+
+ModeloGapAge <- lm(logIng ~ female + age + age2, data = geih_punto4)
+summary(ModeloGapAge)
+stargazer(ModeloGapAge, type = "text")
+
+#Plot con los datos reales. Muestra que si tienen un mismo intercepto pero los ingresos divergen a lo largo del tiempo.
+#Los hombres crecen y las mujeres decrecen
+ggplot(geih_punto4, aes(x = age, y = logIng, colour = female)) + geom_point(alpha = 0.15) + geom_smooth(method = 'lm')
+
+#Plot con los Y estimados. No hay intercepción, aunque muestran la misma pendiente a lo largo del gráfico. Llegan a un punto máximo
+#Y empieza a decrecer
+ggplot(geih_punto4, aes(x = age, y = ModeloGapAge$fitted.values, colour = female)) + geom_point(alpha = 0.15) + geom_smooth()
+
+#Modelo tenienfo en cuenta la interacción
+#Los coeficientes cambian, hay un mayor impacto de género. EL R2 aumenta a 4,24%
+ModeloGapAgeInt <- lm(logIng ~ female + age + age2 + agefem, data = geih_punto4)
+coef(ModeloGapAgeInt)
+summary(ModeloGapAgeInt)
+
+#Plot con los Y estimados. Tienen el mismo intercepto, y la pendiente se parece, sin embargo, los hombres crecen más rápido y llegan
+#a un punto máximo con una edad mucho mayor que las mujeres. Según la gráfica
+ggplot(geih_punto4, aes(x = age, y = ModeloGapAgeInt$fitted.values, colour = female)) + geom_point(alpha = 0.15) + geom_smooth()
+
+
+
+
+#Peak Age con Bootstrap
+
+set.seed(1111)
+ControlEntrenamiento <- trainControl(method = "boot", number = 1000) #Control de train para hacer el Bootstrapping
+ModelosBoot_AgeCAP <- train(logIng ~ female + age + age2,
+                            data = geih_punto4,
+                            method = "lm",
+                            trControl = ControlEntrenamiento) #Correr el modelo con 1000 interacciones para reducir los errores estandar
+
+summary(ModelosBoot_AgeCAP$finalModel$coefficients) #Los errores estándar no se redujeron, es necesario intentar de otra forma
+
+p_load(boot)
+
+model_coef <- function(data, index){
+  coef(lm(logIng ~ female + age + age2, data = data, subset = index)) #Crear la función para calcular los errores estándar
+}
+model_coef(geih_punto4, 1:16138) #Probar la función
+
+ModeloBoot_AgeCAP2 <- boot(geih_punto4, model_coef, R=1000) #Correr el boot. Se puede ver que los errores estándar mejoraran con el boot
+
+
+#Calculamos los intervalos de confianza para cada variable
+lowerlimitFem <- ModelosBoot_AgeCAP$finalModel$coefficients[2] - (1.96*0.01356242)
+upperlimitFem <- ModelosBoot_AgeCAP$finalModel$coefficients[2] + (1.96*0.01356242) 
+ConfidenceIntervalFemale <- c(lowerlimitFem, upperlimitFem)
+
+lowerlimitAge <- ModelosBoot_AgeCAP$finalModel$coefficients[3] - (1.96*0.003509626)
+upperlimitAge <- ModelosBoot_AgeCAP$finalModel$coefficients[3] + (1.96*0.003509626)
+ConfidenceIntervalAge <- c(lowerlimitAge, upperlimitAge)
+
+lowerlimitAge2 <- ModelosBoot_AgeCAP$finalModel$coefficients[4] - (1.96*0.00004273566)
+upperlimitAge2 <- ModelosBoot_AgeCAP$finalModel$coefficients[4] + (1.96*0.00004273566)
+ConfidenceIntervalAge2 <- c(lowerlimitAge2, upperlimitAge2)
+
+#Ninguna de las variables tiene overlap en los intervalos
+
+max(ModelosBoot_AgeCAP$finalModel$fitted.values)
+max(ModeloGapAge$fitted.values)
+
+geih_punto4$fitValuesGAPAGE <- ModelosBoot_AgeCAP$finalModel$fitted.values
+
+#Peakage en la gráfica
+peaked_age <- geih_punto4 %>% 
+  group_by(age, female) %>%
+  summarise(max(fitValuesGAPAGE)) %>%
+  arrange(female)         
+#Para los dos géneros la edad de pico son los 44 años
+
+peaked_age <- ModelosBoot_AgeCAP$finalModel$coefficients[3]/(-ModelosBoot_AgeCAP$finalModel$coefficients[4]*2)
+
+#Ahora se realiza la regresion con la interacción
+geih_punto4$numfem <- as.numeric(geih_punto4$female)
+geih_punto4$numfem <- ifelse(geih_punto4$numfem == 2, 1, 0)
+
+geih_punto4$agefem <- geih_punto4$numfem*geih_punto4$age
+
+#Bootstrap Con modelo de Interaccion
+
+model_coef <- function(data, index){
+  coef(lm(logIng ~ female + age + age2 + agefem, data = data, subset = index)) #Crear la función para calcular los errores estándar
+}
+model_coef(geih_punto4, 1:16138) #Probar la función
+
+ModeloBoot_AgeCAP2 <- boot(geih_punto4, model_coef, R=1000) #Correr el boot. Se puede ver que los errores estándar mejoraran con el boot
+summary(ModeloBoot_AgeCAP2)
+
+
+#Calculamos los intervalos de confianza para cada variable
+lowerlimitFemI <- ModeloBoot_AgeCAP2$t0[2] - (1.96*0.0439099056)
+upperlimitFemI <- ModeloBoot_AgeCAP2$t0[2] + (1.96*0.0439099056) 
+ConfidenceIntervalFemaleI <- c(lowerlimitFemI, upperlimitFemI)
+
+lowerlimitAgeI <- ModeloBoot_AgeCAP2$t0[3] - (1.96*0.0036893856)
+upperlimitAgeI <- ModeloBoot_AgeCAP2$t0[3] + (1.96*0.0036893856)
+ConfidenceIntervalAgeI <- c(lowerlimitAgeI, upperlimitAgeI)
+
+lowerlimitAge2I <- ModeloBoot_AgeCAP2$t0[4] - (1.96*0.0000446136)
+upperlimitAge2I <- ModeloBoot_AgeCAP2$t0[4] + (1.96*0.0000446136)
+ConfidenceIntervalAge2I <- c(lowerlimitAge2I, upperlimitAge2I)
+
+lowerlimitAgeFem <- ModeloBoot_AgeCAP2$t0[5] - (1.96*0.0011546835)
+upperlimitAgeFem <- ModeloBoot_AgeCAP2$t0[5] + (1.96*0.0011546835)
+ConfidenceIntervalAgeFem <- c(lowerlimitAgeFem, upperlimitAgeFem)
+
+#peak age
+PeakAgeMujer <- (ModeloBoot_AgeCAP2$t0[3] + ModeloBoot_AgeCAP2$t0[5])/(-2*ModeloBoot_AgeCAP2$t0[4])
+#Las mujeres tienen su cúspide salarial a los 39.31 años
+
+PeakAgeHombre <- ModeloBoot_AgeCAP2$t0[3]/(-2*ModeloBoot_AgeCAP2$t0[4])
+#Los hombres, por su parte tienen su cúspide salarial a los 48.25 años
+
+
+#Equal pay for equal job

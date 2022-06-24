@@ -508,29 +508,34 @@ corrplot(cor(correla[, unlist(lapply(correla, is.numeric))]))
 #El ingreso total es la suma de cada una de las fuentes de ingresos
 #tanto observadas como imputadas.
 
-geih_p <- geih_p %>%
-  mutate(geih_p, age2=age^2)
-modelOLS <- lm(ingtot ~ age+age2, data = geih_p)
+geih_clean <- geih_clean %>%
+  mutate(geih_clean, age2=age^2)
+modelOLS <- lm(ingtot ~ age+age2, data = geih_clean)
 summary(modelOLS)
 require("stargazer")
-stargazer(modelOLS,type="text")
-##R squared del 2%
+stargazer(modelOLS)
 
-length(predict(modelOLS)) == length(geih_p$ingtot)
-plot(predict(modelOLS), geih_p$ingtot[1:length(predict(modelOLS))])
+##R squared del 1.6%
+
+length(predict(modelOLS)) == length(geih_clean$ingtot)
+plot(predict(modelOLS), geih_clean$ingtot[1:length(predict(modelOLS))])
 abline(a=0, b=1)
 
-plot(x = predict(modelOLS), y = geih_p$ingtot,
+##Se limitan las observaciones para una mejor observación de la estimación predicha vs la observada
+plot(x = predict(modelOLS), y = geih_clean$ingtot,
     xlab='Predicted Values',
     ylab='Actual Values',
-    main='Predicted vs. Actual Values')
+    main='Predicted vs. Actual Values', 
+    ylim = c(0, 5000000))
+abline(a=0, b=1)
+
+plot(y = predict(modelOLS), x = geih_clean$age,
+     ylab='Predicted Values',
+     xlab='Edad',
+     main='Predicted Income by age')
 abline(a=0, b=1)
 
 # plot predicted values and actual values
-
-ggplot(geih_p, aes(x = Predictvalues, y = ingtot)) +
-  geom_point() +
-  geom_abline(intercept = 0, slope = 1, color = "green")
 
 ##What is the “peak age” suggested by the above equation? Use bootstrap to calculate the standard errors and construct the confidence intervals.
 
@@ -540,12 +545,12 @@ R<-1000 # Number of Repetions
 eta_mod1<-rep(0,R)
 
 for (i in 1:R){
-  geih_sample<- sample_frac(geih_p,size=1,replace=TRUE)
+  geih_sample<- sample_frac(geih_clean,size=1,replace=TRUE)
   f <-lm(ingtot ~ age+age2, geih_sample)
   coefs<-f$coefficients
   eta_mod1[i]<-coefs[2]
 }  
-  plot(hist(eta_mod1))
+  plot(hist(eta_mod1), main='Histograma Bootstrap')
   mean(eta_mod1)
   sqrt(var(eta_mod1))
   quantile(eta_mod1,c(0.025,0.975))
@@ -553,9 +558,20 @@ for (i in 1:R){
 ##O con el comando boot 
   
   require("boot")
-  Predictvalues <- function(geih_p, index) {
-    coef(lm(ingtot ~ age+age2, data = geih_p, subset = index))
+  Predictvalues <- function(geih_clean, index) {
+    coef(lm(ingtot ~ age+age2, data = geih_clean, subset = index))
     
   } 
   
-boot(geih_p, Predictvalues, R = 1000)
+boot(geih_clean, Predictvalues, R = 1000)
+
+beta <- coef(lm(ingtot ~ age+age2, data = geih_clean))
+beta1 <- beta[1]
+beta2 <- beta[2]
+beta3 <- beta[3]
+
+funcion <- expression(beta1+beta2*x+beta3*x^2)
+
+derivada <- D(funcion,'x')
+peak_age <- (beta2/(-beta3*2))
+peak_age

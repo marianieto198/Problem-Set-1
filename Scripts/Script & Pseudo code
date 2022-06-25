@@ -1,11 +1,10 @@
-
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%    Data Acquisition    		          %
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ##Paquetes 
 rm(list = ls())
 install.packages("rvest")
-install.packages("pacman")
+require("pacman")
 install.packages("ggpubr")
 install.packages("devtools")
 devtools::install_github("thomasp85/patchwork")
@@ -22,17 +21,6 @@ p_load(scales)
 p_load(ggpubr) 
 p_load(knitr) 
 p_load(kableExtra)
-p_load(ggplot2)
-
-
-
-require(pacman)
-library(rvest)
-library(pacman)
-library(dplyr)
-library(ggplot2)
-library(ggpubr)
-
 
 
 #1. En un primer momento se explora el link para verificar la manera en la que está presentada la información
@@ -43,21 +31,23 @@ library(ggpubr)
 
 #3. Se define la base vacía o la base inicial que será llenada por la información scrapeada de los url
 Pagina1 <- read_html("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_1.html") %>%
-                    html_table()  
+  html_table()  
 class(Pagina1) #La variable es tipo List y toca volverla Data Frame
 
-Pagina1 <- as.data.frame(Pagina1) Volvemos la lista un Data Frame
-df <- Pagina1 #Convertimos la pagina 1 en el DF que se usará para el taller
+Pagina1 <- as.data.frame(Pagina1) # Volvemos la lista un Data Frame
+df <- data.frame()
+
+
 
 #3.1.Para cada chunk de información se extrae un temporal en donde se irá almacenando la información de cada chunk. 
 #Para este paso se utiliza el comando “for” junto con el comando “paste0” para concatenar los diferentes url en un único elemento. 
-for (i in 2:10) {
-   url <- paste0("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_",i,".html") #Vamos iterando la pagina con i
+for (i in 1:10) {
+  url <- paste0("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_",i,".html") #Vamos iterando la pagina con i
   chunk_i <- read_html(url)  %>% 
     html_table()  # Se crea la lista del chunk
   chunk_i <- as.data.frame(chunk_i) #se vuelve data frame el chunk
-#3.2.Se utiliza el comando rbind para pegar las filas de información almacenadas en cada archivo temporal y unificarlas en un único elemento.
- df <-  rbind(df, chunk_i) 
+  #3.2.Se utiliza el comando rbind para pegar las filas de información almacenadas en cada archivo temporal y unificarlas en un único elemento.
+  df <-  rbind(df, chunk_i) 
 }
 
 geih <- df # le cambiamos el nombre
@@ -119,13 +109,13 @@ summary (geih) # se puede ver que hay un gran número de observaciones vacias
 
 #Se elimina la primera variable que no es necesaria
 geih <- geih %>%
-      select(-Var.1)
+  select(-Var.1)
 
 #Ahora se necesita hacer el filtro de la base de datos por personas ocupadas, que vivan en Bogotá y que sean mayores de 18 años
 geih <- geih %>%
-      filter(ocu == 1,
-             dominio == "BOGOTA",
-             age > 18)
+  filter(ocu == 1,
+         dominio == "BOGOTA",
+         age > 18)
 
 dim(geih) # La base pasó de 32177 observaciones a 16397 observaciones
 summary(df) #se puede observar que aunque bajaron los NAs sigue habiendo una presencia significativa en muchas variables
@@ -175,7 +165,7 @@ ggplot(porcentaje_na[101:nrow(porcentaje_na),],
   scale_x_continuous(labels = scales::percent, limits = c(0, 1))
 
 
-Hay un salto de 36% de NAs de la variable ie a 10.6% de la variable  y_total_m 
+#Hay un salto de 36% de NAs de la variable ie a 10.6% de la variable  y_total_m 
 
 #Si la cantidad de missing values es superior al 5% no se pueden imputar los datos (crearlos a partir de la media o la moda)
 ##Se eliminan las variables que tienen más del 5% de NAs
@@ -189,14 +179,15 @@ print(paste("Se eliminaron", k0-k1, "variables. Ahora la base tiene", k1, "colum
 #Ahora solo tenemos 62 variables
 
 porcentaje_na %>%
-              filter(cantidad_na <= 0.05)
+  filter(cantidad_na <= 0.05)
 #Nos quedan 4 variables con NAs: impa, p7070, isa, maxEducLevel
- 
+
+
 #Como tres variables son continuas se reemplaza por la mediana, para que queden en el percentil 50% 
 geih_clean <- geih_clean %>%
-            mutate(impa = ifelse(is.na(impa), median(impa, na.rm = T), impa), #Mediana sin tener en cuenta los NAs
-                   p7070 = ifelse(is.na(p7070), median(p7070, na.rm = T), p7070),
-                   isa = ifelse(is.na(isa), median(isa, na.rm = T), isa))
+  mutate(impa = ifelse(is.na(impa), median(impa, na.rm = T), impa), #Mediana sin tener en cuenta los NAs
+         p7070 = ifelse(is.na(p7070), median(p7070, na.rm = T), p7070),
+         isa = ifelse(is.na(isa), median(isa, na.rm = T), isa))
 
 
 sum(is.na(geih_clean$impa)) #Reviso
@@ -215,9 +206,14 @@ table(geih_clean$maxEducLevel) #Reviso
 sum(is.na(geih_clean$maxEducLevel)) #Reviso
 
 geih_clean %>% #Se revisa que todo el DF esté sin NAs
-          is.na() %>%
-          sum()
+  is.na() %>%
+  sum()
 
+#En adición hay ingresos que no se ven reflajados en el ingreso total. Por tal motivo se actualizará
+#esta variable incluyendo los ingresos del último mes no registrados
+geih_clean <- geih_clean %>%
+              mutate(ingtot = ifelse(ingtot == 0, p7500s1a1 + p7500s2a1 + p7500s3a1 + impa +
+                                       isa , ingtot))
 
 
 ##Existe la opción de normalizar los datos, se agregará el código de manera demostrativa
@@ -463,12 +459,12 @@ cor3 <- ggplot(geih_clean, aes(x = age, y = ingtot)) +
 #Tablas
 ##Se etiquetarán las variables para mayor claridad
 geih_clean = apply_labels(geih_clean,
-                      ingtot = "Ingreso Total",
-                      totalHoursWorked = "Horas trabajadas",
-                      age = "Edad",
-                      p6426 = "Experiencia",
-                      p6210 = "Nivel Educativo",
-                      sex = "Sexo")
+                          ingtot = "Ingreso Total",
+                          totalHoursWorked = "Horas trabajadas",
+                          age = "Edad",
+                          p6426 = "Experiencia",
+                          p6210 = "Nivel Educativo",
+                          sex = "Sexo")
 #Tablas descriptivas
 
 vartable <- st(geih_clean, vars = c('ingtot','totalHoursWorked', 'p6426', 'age'), labels = c("Ingresos Totales", "Horas trabajadas", "Experiencia", "Edad"))
@@ -476,9 +472,9 @@ vartable <- st(geih_clean, vars = c('ingtot','totalHoursWorked', 'p6426', 'age')
 sumar1 <- describe(geih_clean[ , c('ingtot', 'age', 'totalHoursWorked', 'p6426')],fast=TRUE)
 
 stargazer(geih_clean[c('ingtot', 'age', 'totalHoursWorked', 'p6426')], type = "text", 
-                             digits=2, median = TRUE, iqr = TRUE,
-                             title="Descriptive statistics",
-                             covariate.labels=c("Ingreso total","Edad","Horas trabajadas","p6426"),out="table1.txt")
+          digits=2, median = TRUE, iqr = TRUE,
+          title="Descriptive statistics",
+          covariate.labels=c("Ingreso total","Edad","Horas trabajadas","p6426"),out="table1.txt")
 
 ##Correlaciones
 # Primero seleccionamos las columnas numéricas
@@ -507,33 +503,6 @@ corrplot(cor(correla[, unlist(lapply(correla, is.numeric))]))
 
 #El ingreso total es la suma de cada una de las fuentes de ingresos
 #tanto observadas como imputadas.
-#Se analizan las distribuciones de los dos tipos de ingreso, dado que ingtotes se eliminó por la cantidad de missings
-
-i1 <- ggplot(geih_clean, aes(y = ingtot)) +
-  geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
-  theme_classic() +
-  labs(y = "Ingresos totales") +
-  scale_y_continuous(labels = scales::dollar) +
-  scale_x_discrete( ) 
-
-i2 <- ggplot(geih_clean, aes(y = ingtotob)) +
-  geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
-  theme_classic() +
-  labs(y = "Ingresos totales observados") +
-  scale_y_continuous(labels = scales::dollar) +
-  scale_x_discrete( ) 
-
-(i1 | i2) 
-
-ggplot(geih_clean, aes(x = ingtotob, y = ingtot)) +
-  geom_point(color = "darkslategray3", alpha = 0.5) +
-  theme_classic() +
-  scale_y_continuous(labels = scales::dollar) +
-  scale_x_continuous(labels = scales::dollar) +
-  # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
-  labs(x = "Ingreso observado", y = "Ingresos totales (log)")
-  
-##Correr modelo OLS
 
 geih_clean <- geih_clean %>%
   mutate(geih_clean, age2=age^2)
@@ -550,26 +519,25 @@ abline(a=0, b=1)
 
 ##Se limitan las observaciones para una mejor observación de la estimación predicha vs la observada
 plot(x = predict(modelOLS), y = geih_clean$ingtot,
-    xlab='Predicted Values',
-    ylab='Actual Values',
-    main='Predicted vs. Actual Values', 
-    ylim = c(0, 5000000))
+     xlab='Predicted Values',
+     ylab='Actual Values',
+     main='Predicted vs. Actual Values', 
+     ylim = c(0, 5000000))
 abline(a=0, b=1)
 
-# plot predicted values con la edad
 plot(y = predict(modelOLS), x = geih_clean$age,
      ylab='Predicted Values',
      xlab='Edad',
      main='Predicted Income by age')
 abline(a=0, b=1)
 
-
+# plot predicted values and actual values
 
 ##What is the “peak age” suggested by the above equation? Use bootstrap to calculate the standard errors and construct the confidence intervals.
 
 require("tidyverse")
 set.seed(1111)
-R<-4920 # El número de repeticiones se definió con el 30% de la muestra
+R<-1000 # Number of Repetions
 eta_mod1<-rep(0,R)
 
 for (i in 1:R){
@@ -578,22 +546,20 @@ for (i in 1:R){
   coefs<-f$coefficients
   eta_mod1[i]<-coefs[2]
 }  
-  plot(hist(eta_mod1), main='Histograma Bootstrap')
-  mean(eta_mod1)
-  sqrt(var(eta_mod1))
-  quantile(eta_mod1,c(0.025,0.975))
-  
-##O con el comando boot 
-  
-  require("boot")
-  Predictvalues <- function(geih_clean, index) {
-    coef(lm(ingtot ~ age+age2, data = geih_clean, subset = index))
-    
-  } 
-  
-boot(geih_clean, Predictvalues, R = 4920)
+plot(hist(eta_mod1), main='Histograma Bootstrap')
+mean(eta_mod1)
+sqrt(var(eta_mod1))
+quantile(eta_mod1,c(0.025,0.975))
 
-##Se saca la derivada e iguala a cero para obtener la "peak age"
+##O con el comando boot 
+
+require("boot")
+Predictvalues <- function(geih_clean, index) {
+  coef(lm(ingtot ~ age+age2, data = geih_clean, subset = index))
+  
+} 
+
+boot(geih_clean, Predictvalues, R = 1000)
 
 beta <- coef(lm(ingtot ~ age+age2, data = geih_clean))
 beta1 <- beta[1]
@@ -609,15 +575,15 @@ peak_age
 #-----------Punto 4 GAP Earnings GAP-------------------
 #-----------Punto 4-------------------
 #Base a utilizar en este punto
-geih_clean <- geih_sinna %>%
-                select(ingtot, sex, age)
+geih_punto4 <- geih_clean %>%
+  select(ingtot, sex, age)
 
 #Transformar el ingreso en logaritmo
 geih_punto4 <- geih_punto4 %>%
-                mutate(logIng = log(ingtot))
+  mutate(logIng = log(ingtot))
 
 geih_punto4 <- geih_punto4 %>%
-  filter(logIng > 0)
+  mutate(logIng = ifelse(logIng < 0, 0, logIng))
 
 #Mirar las proporciones
 table(geih_punto4$sex)
@@ -637,8 +603,10 @@ summary(geih_punto4)
 
 #Correlación
 M_p4 <- geih_punto4 %>%
-          select(-sex) %>%
-          cor()
+        select(-sex) %>%
+        mutate(female = as.numeric(female)) %>%
+  cor()
+
 M_p4 #No está tan clara la correlación
 
 #Modelo lineal
@@ -658,7 +626,7 @@ GapPredict <- predict(ModeloGap)
 
 #Se incluyen los y estimados para comprarar el modelo
 geih_punto4 <- geih_punto4 %>%
-                mutate(fitValues = ModeloGap$fitted.values)
+  mutate(fitValues = ModeloGap$fitted.values)
 
 #Solo hay dos valores para los y estimados: uno  para mujer (13.97) y otro para hombre (14.07)
 summary(geih_punto4)
@@ -674,7 +642,7 @@ ggplot(geih_punto4, aes(x= fitValues, fill = female)) + geom_histogram(position 
 
 #Modelo con edad y genero
 geih_punto4 <- geih_punto4 %>%
-                mutate(age2 = age^2)
+  mutate(age2 = age^2)
 
 ModeloGapAge <- lm(logIng ~ female + age + age2, data = geih_punto4)
 summary(ModeloGapAge)
@@ -705,9 +673,6 @@ ggplot(geih_punto4, aes(x = age, y = ModeloGapAgeInt$fitted.values, colour = fem
 
 
 #Peak Age con Bootstrap
-
-
-
 p_load(boot)
 
 model_coef <- function(data, index){
@@ -715,7 +680,8 @@ model_coef <- function(data, index){
 }
 model_coef(geih_punto4, 1:16138) #Probar la función
 
-ModeloBoot_AgeCAP2 <- boot(geih_punto4, model_coef, R=1000) #Correr el boot. Se puede ver que los errores estándar mejoraran con el boot
+r = round(nrow(geih_punto4)*0.2, 0)
+ModeloBoot_AgeCAP2 <- boot(geih_punto4, model_coef, R= r) #Correr el boot. Se puede ver que los errores estándar mejoraran con el boot
 
 BootSE <- as.data.frame(ModeloBoot_AgeCAP2$t)
 
@@ -736,12 +702,9 @@ max(ModeloGapAge$fitted.values)
 
 geih_punto4$fitValuesGAPAGE <- ModelosBoot_AgeCAP$finalModel$fitted.values
 
-#Peakage en la gráfica
-        
-#Para los dos géneros la edad de pico son los 44 años
-
-peaked_age <- ModelosBoot_AgeCAP$finalModel$coefficients[3]/(-ModelosBoot_AgeCAP$finalModel$coefficients[4]*2)
-
+#PeakAge
+peaked_age <- ModeloBoot_AgeCAP2$t0[3]/(-ModeloBoot_AgeCAP2$t0[4]*2)
+# El área bajo este modelo es de 44.2 años para los dos generos
 
 #Bootstrap para interacción
 
@@ -750,7 +713,7 @@ model_coef2 <- function(data, index){
 }
 model_coef2(geih_punto4, 1:16138) #Probar la función
 
-ModeloBoot_AgeFEM <- boot(geih_punto4, model_coef2, R=1000) #Correr el boot. Se puede ver que los errores estándar mejoraran con el boot
+ModeloBoot_AgeFEM <- boot(geih_punto4, model_coef2, R=r) #Correr el boot. Se puede ver que los errores estándar mejoraran con el boot
 summary(ModeloBoot_AgeFEM)
 
 
@@ -786,10 +749,11 @@ PeakAgeHombre <- ModeloBoot_AgeFEM$t0[3]/(-2*ModeloBoot_AgeFEM$t0[4])
 #a. Split the sample
 
 #Incluir variables de los modelos anteriores
-geih_clean$logIng <- log(geih_sinna$ingtot)
-geih_clean$age2 <- (geih_sinna$age)^2
-geih_clean$female <- ifelse(geih_sinna$sex == "0",1,0)
-geih_clean$agefem <- geih_sinna$age*geih_sinna$female
+geih_clean$logIng <- log(geih_clean$ingtot)
+geih_clean$logIng <- ifelse(geih_clean$logIng < 0, 0, geih_clean$logIng)
+geih_clean$age2 <- (geih_clean$age)^2
+geih_clean$female <- ifelse(geih_clean$sex == "0",1,0)
+geih_clean$agefem <- geih_clean$age*geih_clean$female
 
 #Separar la muestra:
 set.seed(10102) #Sembrar la semilla para aleatorizar la muestra
@@ -819,12 +783,8 @@ mean(geih.train$ingtot)
 ModeloEdad <- lm(ingtot ~ age + age2, data = geih.train)
 
 #Modelo GAP y edad
-#Filtramos los logaritmos mayores a 0
-geih.train2 <- geih.train %>%
-                filter(logIng > 0)
-
-ModeloFemale <- lm(logIng ~ female, data = geih.train2)
-ModeloAgeGAP <- lm(logIng ~ female + age + age2 + agefem, data = geih.train2)
+ModeloFemale <- lm(logIng ~ female, data = geih.train)
+ModeloAgeGAP <- lm(logIng ~ female + age + age2 + agefem, data = geih.train)
 
 stargazer(Modelobase, ModeloEdad, ModeloFemale, ModeloAgeGAP, type = "text")
 

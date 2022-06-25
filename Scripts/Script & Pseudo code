@@ -507,6 +507,33 @@ corrplot(cor(correla[, unlist(lapply(correla, is.numeric))]))
 
 #El ingreso total es la suma de cada una de las fuentes de ingresos
 #tanto observadas como imputadas.
+#Se analizan las distribuciones de los dos tipos de ingreso, dado que ingtotes se eliminó por la cantidad de missings
+
+i1 <- ggplot(geih_clean, aes(y = ingtot)) +
+  geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
+  theme_classic() +
+  labs(y = "Ingresos totales") +
+  scale_y_continuous(labels = scales::dollar) +
+  scale_x_discrete( ) 
+
+i2 <- ggplot(geih_clean, aes(y = ingtotob)) +
+  geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
+  theme_classic() +
+  labs(y = "Ingresos totales observados") +
+  scale_y_continuous(labels = scales::dollar) +
+  scale_x_discrete( ) 
+
+(i1 | i2) 
+
+ggplot(geih_clean, aes(x = ingtotob, y = ingtot)) +
+  geom_point(color = "darkslategray3", alpha = 0.5) +
+  theme_classic() +
+  scale_y_continuous(labels = scales::dollar) +
+  scale_x_continuous(labels = scales::dollar) +
+  # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
+  labs(x = "Ingreso observado", y = "Ingresos totales (log)")
+  
+##Correr modelo OLS
 
 geih_clean <- geih_clean %>%
   mutate(geih_clean, age2=age^2)
@@ -529,19 +556,20 @@ plot(x = predict(modelOLS), y = geih_clean$ingtot,
     ylim = c(0, 5000000))
 abline(a=0, b=1)
 
+# plot predicted values con la edad
 plot(y = predict(modelOLS), x = geih_clean$age,
      ylab='Predicted Values',
      xlab='Edad',
      main='Predicted Income by age')
 abline(a=0, b=1)
 
-# plot predicted values and actual values
+
 
 ##What is the “peak age” suggested by the above equation? Use bootstrap to calculate the standard errors and construct the confidence intervals.
 
 require("tidyverse")
 set.seed(1111)
-R<-1000 # Number of Repetions
+R<-4920 # El número de repeticiones se definió con el 30% de la muestra
 eta_mod1<-rep(0,R)
 
 for (i in 1:R){
@@ -563,7 +591,9 @@ for (i in 1:R){
     
   } 
   
-boot(geih_clean, Predictvalues, R = 1000)
+boot(geih_clean, Predictvalues, R = 4920)
+
+##Se saca la derivada e iguala a cero para obtener la "peak age"
 
 beta <- coef(lm(ingtot ~ age+age2, data = geih_clean))
 beta1 <- beta[1]

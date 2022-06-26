@@ -369,8 +369,6 @@ d2 <- ggplot(geih_clean, aes(y = ingtot)) +
   labs(y = "Ingresos totales") +
   scale_y_continuous(labels = scales::dollar) +
   scale_x_discrete( ) 
-##Eliminamos una única observación que indica un ingreso total de $50 millones.
-geih_clean <- geih_clean=geih[geih$ingtotes<40000000,]
 
 ##Distribución experiencia
 d3 <- ggplot(geih_clean, aes(y = p6426)) +
@@ -392,6 +390,33 @@ ggarrange(d1, d2, d3, d4, d5, nrow = 3, ncol = 2)
 (d1 | d2) /
   (d3 | d4)
 
+
+##Distribución Educación
+d5 <- ggplot(geih_clean, aes(as.factor(p6210), totalHoursWorked)) +
+  geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
+  theme_classic() +
+  labs(y = "Horas trabajadas") +
+  scale_y_continuous() +
+  scale_x_discrete( ) 
+d5
+##Distribución por ingreso y sexo
+d6 <- ggplot(geih_clean, aes(as.factor(p6210), ingtot)) +
+  geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
+  theme_classic() +
+  labs(y = "Ingreso total") +
+  scale_y_continuous() +
+  scale_x_discrete( ) 
+
+d7 <- ggplot(geih_clean, aes(as.factor(sex), ingtot)) +
+  geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
+  theme_classic() +
+  labs(y = "Ingreso total") +
+  scale_y_continuous() +
+  scale_x_discrete( ) 
+
+(d7 | d6) /
+  (d5)
+  
 ##Estadísticas descriptivas, tablas y figuras
 
 #Variables de interés defindas: 
@@ -429,6 +454,18 @@ ggplot() +
   labs(x = "Zona", y = "Frequencia") + 
   theme_classic()
 ##Todas las observaciones se encuentran en zona urbana, por lo que no se tendrá en cuenta
+
+by1 <- ggplot(data=geih_clean) +
+  geom_histogram(mapping=aes(x=ingtot , group= as.factor(sex), fill=as.factor(sex))) + 
+  theme_classic()
+by1 + scale_fill_manual(values =c("0"="darkslategray3", "1"="blue"), label=c("0"="Mujer", "1"="Hombre"), name="Sexo")
+
+by2 <- ggplot(data=geih_clean) +
+  geom_histogram(mapping=aes(x=ingtot , group= as.factor(p6210), fill=as.factor(p6210))) + 
+  theme_classic()
+by2 + scale_fill_manual(values =c("1"="darkslategray3", "2"="blue", "3"="aquamarine4", "4"="azure3", "5"="chartreuse4", "6"="chocolate3", "9"="coral2"), 
+       label=c("1"="Ninguno", "2"="Preescolar", "3"="Básica Primaria", "4"="Básica Secundaria", "5"="Media", "6"="Superior o universitaria", "9"="No sabe"), name="Nivel Educativo")
+
 
 ##Correlación ingresos y horas trabajadas
 cor1 <- ggplot(geih_clean, aes(x = totalHoursWorked, y = ingtot)) +
@@ -487,7 +524,7 @@ upper[upper.tri(mcor)]<-""
 upper<-as.data.frame(upper)
 
 corrplot(cor(correla[, unlist(lapply(correla, is.numeric))]))
-
+write_xlsx(upper,"Correla.xlsx")
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%    Age-earnings profile 		          %
@@ -503,7 +540,33 @@ corrplot(cor(correla[, unlist(lapply(correla, is.numeric))]))
 
 #El ingreso total es la suma de cada una de las fuentes de ingresos
 #tanto observadas como imputadas.
+#Se analizan las distribuciones de los dos tipos de ingreso, dado que ingtotes se eliminó por la cantidad de missings
 
+i1 <- ggplot(geih_clean, aes(y = ingtot)) +
+  geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
+  theme_classic() +
+  labs(y = "Ingresos totales") +
+  scale_y_continuous(labels = scales::dollar) +
+  scale_x_discrete( ) 
+
+i2 <- ggplot(geih_clean, aes(y = ingtotob)) +
+  geom_boxplot(fill = "darkslategray3", alpha = 0.5) +
+  theme_classic() +
+  labs(y = "Ingresos totales observados") +
+  scale_y_continuous(labels = scales::dollar) +
+  scale_x_discrete( ) 
+
+(i1 | i2) 
+
+ggplot(geih_clean, aes(x = ingtotob, y = ingtot)) +
+  geom_point(color = "darkslategray3", alpha = 0.5) +
+  theme_classic() +
+  scale_y_continuous(labels = scales::dollar) +
+  scale_x_continuous(labels = scales::dollar) +
+  # scale_y_continuous(labels = scales::dollar, trans = 'log10') +
+  labs(x = "Ingreso observado", y = "Ingresos totales (log)")
+
+##Correr modelo OLS
 geih_clean <- geih_clean %>%
   mutate(geih_clean, age2=age^2)
 modelOLS <- lm(ingtot ~ age+age2, data = geih_clean)
@@ -531,13 +594,12 @@ plot(y = predict(modelOLS), x = geih_clean$age,
      main='Predicted Income by age')
 abline(a=0, b=1)
 
-# plot predicted values and actual values
-
 ##What is the “peak age” suggested by the above equation? Use bootstrap to calculate the standard errors and construct the confidence intervals.
 
 require("tidyverse")
 set.seed(1111)
-R<-1000 # Number of Repetions
+r = round(nrow(geih_clean)*0.3, 0)
+R<-r # Number of Repetions
 eta_mod1<-rep(0,R)
 
 for (i in 1:R){
@@ -559,7 +621,9 @@ Predictvalues <- function(geih_clean, index) {
   
 } 
 
-boot(geih_clean, Predictvalues, R = 1000)
+boot(geih_clean, Predictvalues, R = r)
+
+##Se saca la derivada e iguala a cero para obtener la "peak age"
 
 beta <- coef(lm(ingtot ~ age+age2, data = geih_clean))
 beta1 <- beta[1]

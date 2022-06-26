@@ -805,7 +805,34 @@ PeakAgeMujer <- (ModeloBoot_AgeFEM$t0[3] + ModeloBoot_AgeFEM$t0[5])/(-2*ModeloBo
 PeakAgeHombre <- ModeloBoot_AgeFEM$t0[3]/(-2*ModeloBoot_AgeFEM$t0[4])
 #Los hombres, por su parte tienen su cúspide salarial a los 48.25 años
 
-
+#Punto 4 - Teorema FWL
+#se incorpora la variable oficio en la base de datos 
+str(geih_clean$oficio)
+geih_punto4$oficio = geih_clean$oficio
+require("tidyverse")
+#Se analiza la relación entre las variables graficamente 
+ggplot(geih_punto4) +
+  geom_bar(aes(x=female, fill=logIng))
+ggplot(geih_punto4) +
+  geom_bar(aes(x=oficio, fill=logIng))
+#Se incorpora en el modelo la variable oficio 
+modelo.ols.ep<-lm(logIng ~ female + oficio, data = geih_punto4)
+summary(modelo.ols.ep)
+stargazer(modelo.ols.ep, type="text") #En el primer modelo - coeficiente es -0.18*** y r2 es 0.185
+#Calculamos female tilde (y=female x=oficio)
+modelo_female_tilde<-lm(as.numeric(female) ~ oficio, data=geih_punto4)
+summary(modelo_female_tilde)
+female_tilde<-modelo_female_tilde$residuals
+reg2_ep<-lm(logIng ~ female_tilde, data = geih_punto4)
+summary(reg2_ep)
+stargazer(reg2_ep, type="text") #En esta regresion se observa que el coeficiente sigue siendo -0.18
+#Calculamos ingreso tilde (y=ingreso x=oficio)
+modelo_ingreso_tilde<-lm(logIng~ oficio, data=geih_punto4)
+ingreso_tilde<-modelo_ingreso_tilde$residuals
+reg3_ep<-lm(ingreso_tilde~ female_tilde)
+summary(reg3_ep)
+stargazer(modelo.ols.ep,reg2_ep,reg3_ep, type="text") 
+#Finalmente, se observa que en las tres regresiones el coeficiente es igual
 
 
 #--------------Punto 5----------------------------------------------
@@ -851,32 +878,3 @@ ModeloFemale <- lm(logIng ~ female, data = geih.train)
 ModeloAgeGAP <- lm(logIng ~ female + age + age2 + agefem, data = geih.train)
 
 stargazer(Modelobase, ModeloEdad, ModeloFemale, ModeloAgeGAP, type = "text")
-
-#Punto 4 - Teorema FWL
-#se incorpora la variable oficio en la base de datos 
-str(geih_clean$oficio)
-geih_punto4$oficio = geih_clean$oficio
-require("tidyverse")
-#Se analiza la relación entre las variables graficamente 
-ggplot(geih_punto4) +
-  geom_bar(aes(x=female, fill=logIng))
-ggplot(geih_punto4) +
-  geom_bar(aes(x=oficio, fill=logIng))
-#Se incorpora en el modelo la variable oficio 
-modelo.ols.ep<-lm(logIng ~ female + oficio, data = geih_punto4)
-summary(modelo.ols.ep)
-stargazer(modelo.ols.ep, type="text") #En el primer modelo - coeficiente es -0.18*** y r2 es 0.185
-#Calculamos female tilde (y=female x=oficio)
-modelo_female_tilde<-lm(as.numeric(female) ~ oficio, data=geih_punto4)
-summary(modelo_female_tilde)
-female_tilde<-modelo_female_tilde$residuals
-reg2_ep<-lm(logIng ~ female_tilde, data = geih_punto4)
-summary(reg2_ep)
-stargazer(reg2_ep, type="text") #En esta regresion se observa que el coeficiente sigue siendo -0.18
-#Calculamos ingreso tilde (y=ingreso x=oficio)
-modelo_ingreso_tilde<-lm(logIng~ oficio, data=geih_punto4)
-ingreso_tilde<-modelo_ingreso_tilde$residuals
-reg3_ep<-lm(ingreso_tilde~ female_tilde)
-summary(reg3_ep)
-stargazer(modelo.ols.ep,reg2_ep,reg3_ep, type="text") 
-#Finalmente, se observa que en las tres regresiones el coeficiente es igual

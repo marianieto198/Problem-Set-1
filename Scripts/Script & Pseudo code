@@ -660,33 +660,37 @@ geih_punto4 <- geih_punto4 %>%
 geih_punto4 <- geih_punto4 %>%
   mutate(female = as.factor(female))
 
-table(geih_punto4$female)
+prop.table(table(geih_punto4$female))
+#La muestra está balanceada 52% hombres 47%mujer
+
 
 str(geih_punto4)
 summary(geih_punto4)
 
 #Correlación
 M_p4 <- geih_punto4 %>%
-        select(-sex) %>%
-        mutate(female = as.numeric(female)) %>%
+  select(-sex) %>%
+  mutate(female = as.numeric(female)) %>%
   cor()
 
 M_p4 #No está tan clara la correlación
+corrplot::corrplot(M_p4)
 
 #Modelo lineal
 #Estimar el modelo de gap
 ModeloGap <- lm(logIng ~ female, data = geih_punto4)
 
-geih_punto4 %>% ggplot(aes(x = logIng)) + geom_histogram()
+
+
+geih_punto4 %>% ggplot(aes(x = logIng)) + geom_histogram() + labs(x = "Logaritmo del ingreso")
 
 summary(ModeloGap)
 
 #El modelo muestra que la variable independiente es significativa y muestra que al ser mujer se reduce el ingreso en en un 19.6% Sin embargo,
 #el R2 es solamente del 1.2%, lo que significa que la variable de género solo explica un 1.2% la varianza del modelo.
 stargazer(ModeloGap, type = "text")
+stargazer(ModeloGap, type = "text", out = "ModeloGap.txt")
 
-
-GapPredict <- predict(ModeloGap)
 
 #Se incluyen los y estimados para comprarar el modelo
 geih_punto4 <- geih_punto4 %>%
@@ -710,15 +714,18 @@ geih_punto4 <- geih_punto4 %>%
 
 ModeloGapAge <- lm(logIng ~ female + age + age2, data = geih_punto4)
 summary(ModeloGapAge)
-stargazer(ModeloGapAge, type = "text")
+stargazer(ModeloGapAge, type = "text", out = "ModeloGapAge.txt")
 
 #Plot con los datos reales. Muestra que si tienen un mismo intercepto pero los ingresos divergen a lo largo del tiempo.
 #Los hombres crecen y las mujeres decrecen
-ggplot(geih_punto4, aes(x = age, y = logIng, colour = female)) + geom_point(alpha = 0.15) + geom_smooth(method = 'lm')
+ggplot(geih_punto4, aes(x = age, y = logIng, colour = female)) + geom_point(alpha = 0.15) + geom_smooth(method = 'lm') +
+labs(x="Edad", y="Logaritmo del ingreso", colour = "Mujer")  
 
 #Plot con los Y estimados. No hay intercepción, aunque muestran la misma pendiente a lo largo del gráfico. Llegan a un punto máximo
 #Y empieza a decrecer
-ggplot(geih_punto4, aes(x = age, y = ModeloGapAge$fitted.values, colour = female)) + geom_point(alpha = 0.15) + geom_smooth()
+ggplot(geih_punto4, aes(x = age, y = ModeloGapAge$fitted.values, colour = female)) + geom_point(alpha = 0.15) + geom_smooth() +
+  labs(x="Edad", y="Logaritmo del ingreso", colour = "Mujer")  
+
 
 #Ahora se realiza la regresion con la interacción
 geih_punto4$numfem <- as.numeric(geih_punto4$female)
@@ -726,14 +733,18 @@ geih_punto4$numfem <- ifelse(geih_punto4$numfem == 2, 1, 0)
 
 geih_punto4$agefem <- geih_punto4$numfem*geih_punto4$age
 
+#ExportarBD
+write.table(geih_punto4, file = "Geih_punto4.csv", sep = ",", quote = FALSE, row.names = F)
+
 #Los coeficientes cambian, hay un mayor impacto de género. EL R2 aumenta a 4,24%
 ModeloGapAgeInt <- lm(logIng ~ female + age + age2 + agefem, data = geih_punto4)
 coef(ModeloGapAgeInt)
 summary(ModeloGapAgeInt)
-
+stargazer(ModeloGapAgeInt, type = "text", out = "ModeloGapAgeInt.txt")
 #Plot con los Y estimados. No hay intercepción, aunque muestran la misma pendiente a lo largo del gráfico. Llegan a un punto máximo
 #Y empieza a decrecer
-ggplot(geih_punto4, aes(x = age, y = ModeloGapAgeInt$fitted.values, colour = female)) + geom_point(alpha = 0.15) + geom_smooth()
+ggplot(geih_punto4, aes(x = age, y = ModeloGapAgeInt$fitted.values, colour = female)) + geom_point(alpha = 0.15) + geom_smooth() +
+  labs(x="Edad", y="Logaritmo del ingreso", colour = "Mujer")  
 
 
 #Peak Age con Bootstrap
@@ -797,6 +808,12 @@ IC_Age2Mod2 <- quantile(BootSEFAGE$V4,c(0.025,0.975))
 hist(BootSEFAGE$V5)
 IC_AgeFemMod2 <- quantile(BootSEFAGE$V5,c(0.025,0.975))
 
+IntervaloDeConfianza <- c(IC_FMod2, IC_AgeMod2, IC_Age2Mod2, IC_AgeFemMod2)
+NamesIC <- c("IC_FMod2", "IC_AgeMod2", "IC_Age2Mod2", "IC_AgeFemMod2")
+IntervaloDeConfianza <- matrix(IntervaloDeConfianza, nrow = 4, ncol = 2)
+rownames(IntervaloDeConfianza) <- NamesIC
+colnames(IntervaloDeConfianza) <- c("2.5%", "97.5%")
+stargazer(IntervaloDeConfianza, type ="text", out = "IC_Punto4.txt")
 
 #peak age
 PeakAgeMujer <- (ModeloBoot_AgeFEM$t0[3] + ModeloBoot_AgeFEM$t0[5])/(-2*ModeloBoot_AgeFEM$t0[4])
@@ -815,6 +832,8 @@ ggplot(geih_punto4) +
   geom_bar(aes(x=female, fill=logIng))
 ggplot(geih_punto4) +
   geom_bar(aes(x=oficio, fill=logIng))
+ggplot(geih_punto4) +
+  geom_histogram(aes(x=logIng, colour = female)) + facet_wrap(~oficio)
 #Se incorpora en el modelo la variable oficio 
 modelo.ols.ep<-lm(logIng ~ female + oficio, data = geih_punto4)
 summary(modelo.ols.ep)
@@ -831,7 +850,7 @@ modelo_ingreso_tilde<-lm(logIng~ oficio, data=geih_punto4)
 ingreso_tilde<-modelo_ingreso_tilde$residuals
 reg3_ep<-lm(ingreso_tilde~ female_tilde)
 summary(reg3_ep)
-stargazer(modelo.ols.ep,reg2_ep,reg3_ep, type="text") 
+stargazer(modelo.ols.ep,reg2_ep,reg3_ep, type="text" , out = "TeoremaFWL.txt") 
 #Finalmente, se observa que en las tres regresiones el coeficiente es igual
 
 

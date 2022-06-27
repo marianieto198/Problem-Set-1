@@ -636,6 +636,17 @@ derivada <- D(funcion,'x')
 peak_age <- (beta2/(-beta3*2))
 peak_age
 
+##O de la siguiente manera con el Boot
+ModeloBoot <- boot(geih_clean, Predictvalues, R = r)
+
+ BootSE3 <- as.data.frame(ModeloBoot$t)
+hist(BootSE$V2)
+IC_Mod1age3 <- quantile(BootSE3$V2,c(0.025,0.975))
+IC_AgeMod1age3 <- quantile(BootSE$V3,c(0.025,0.975))
+
+max(modelOLS$fitted.values)
+peaked_age <- ModeloBoot$t0[2]/(-ModeloBoot$t0[3]*2)
+
 #-----------Punto 4 GAP Earnings GAP-------------------
 #-----------Punto 4-------------------
 #Base a utilizar en este punto

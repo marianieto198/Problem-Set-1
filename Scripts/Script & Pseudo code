@@ -828,10 +828,10 @@ stargazer(IntervaloDeConfianza, type ="text", out = "IC_Punto4.txt")
 
 #peak age
 PeakAgeMujer <- (ModeloBoot_AgeFEM$t0[3] + ModeloBoot_AgeFEM$t0[5])/(-2*ModeloBoot_AgeFEM$t0[4])
-#Las mujeres tienen su cúspide salarial a los 39.31 años
+#Las mujeres tienen su cúspide salarial a los 40.06 años
 
 PeakAgeHombre <- ModeloBoot_AgeFEM$t0[3]/(-2*ModeloBoot_AgeFEM$t0[4])
-#Los hombres, por su parte tienen su cúspide salarial a los 48.25 años
+#Los hombres, por su parte tienen su cúspide salarial a los 47.40 años
 
 #Punto 4 - Teorema FWL
 #se incorpora la variable oficio en la base de datos 
@@ -875,9 +875,11 @@ geih_clean$logIng <- ifelse(geih_clean$logIng < 0, 0, geih_clean$logIng)
 geih_clean$age2 <- (geih_clean$age)^2
 geih_clean$female <- ifelse(geih_clean$sex == "0",1,0)
 geih_clean$agefem <- geih_clean$age*geih_clean$female
+geih_clean$totalHoursWorked2<-(geih_clean$totalHoursWorked)^2
+geih_clean$totalHoursWorked3<-(geih_clean$totalHoursWorked)^3
 
 #Separar la muestra:
-set.seed(10102) #Sembrar la semilla para aleatorizar la muestra
+set.seed(10101) #Sembrar la semilla para aleatorizar la muestra
 #Dividir la muestra en 70% para entrenar y 30% para hacer el testeo
 index <-  round(nrow(geih_clean)*0.3,digits=0)
 #Muestra aleatorizada del df y mantener el número de observaciones del indice
@@ -890,7 +892,7 @@ geih.test<-geih_clean[test.indices,]
 YTrain <- geih.train$ingtot
 XTrain <- geih.train %>% select(-ingtot)
 #Seleccionar el set de testeo en variables independientes y dependientes
-YTest <- geih.test$Diagnosis
+YTest <- geih.test$ingtot
 XTest <- geih.test %>% select(-ingtot)
 
 #Regresion de solo el intercepto
@@ -908,3 +910,79 @@ ModeloFemale <- lm(logIng ~ female, data = geih.train)
 ModeloAgeGAP <- lm(logIng ~ female + age + age2 + agefem, data = geih.train)
 
 stargazer(Modelobase, ModeloEdad, ModeloFemale, ModeloAgeGAP, type = "text")
+
+#Modelos con transformaciones en x - Mayor complejidad
+#Modelo 1. 
+Modelo_C_1<-lm(logIng ~ female + estrato1 + p6426 + maxEducLevel, data=geih.train)
+#Modelo 2. 
+Modelo_C_2<-lm(logIng ~ female + p6426 + maxEducLevel + female*maxEducLevel, data=geih.train)
+#Modelo 3. 
+Modelo_C_3<-lm(logIng ~ female + p6426 + age + age2 + p6426*age, data=geih.train)
+#Modelo 4. 
+Modelo_C_4<-lm(logIng ~ female + p6426 + informal + p6240 + p7090 + totalHoursWorked2 + totalHoursWorked3, data=geih.train)
+#Modelo 5
+Modelo_C_5<-lm(logIng ~ female + p6426 + totalHoursWorked + age + totalHoursWorked*female + p7090*female, data=geih.train)
+
+
+#Reporte y comparacion de prediction errors
+logYtest <- log(YTest)
+logYtest <- ifelse(logYtest < 0 , 0, logYtest)
+
+#RMSE Modelo 1
+Modelo_C_1_Summ<-summary(Modelo_C_1)
+rmse_1_dentromuestra<-sqrt(mean(Modelo_C_1_Summ$residuals^2))
+print(rmse_1_dentromuestra) #RMSE1 = 1.047089
+YhatModelo1 <- predict(Modelo_C_1, XTest)
+SSEModelo1 <- sum((YhatModelo1-logYtest)^2)
+MSE_1_fueramuestra <- SSEModelo1/length(logYtest)
+RMSE_1_fueramuestra <- sqrt(MSE_1_fueramuestra)
+
+#RMSE Modelo 2
+Modelo_C_2_Summ<-summary(Modelo_C_2)
+rmse_2<-sqrt(mean(Modelo_C_2_Summ$residuals^2))
+print(rmse_2) #RMSE2 = 1.082645
+YhatModelo2 <- predict(Modelo_C_2, XTest)
+SSEModelo2 <- sum((YhatModelo2-logYtest)^2)
+MSE_2_fueramuestra <- SSEModelo2/length(logYtest)
+RMSE_2_fueramuestra <- sqrt(MSE_2_fueramuestra)
+
+#RMSE Modelo 3
+Modelo_C_3_Summ<-summary(Modelo_C_3)
+rmse_3<-sqrt(mean(Modelo_C_3_Summ$residuals^2))
+print(rmse_3) #RMSE3 = 1.146387
+YhatModelo3 <- predict(Modelo_C_3, XTest)
+SSEModelo3 <- sum((YhatModelo3-logYtest)^2)
+MSE_3_fueramuestra <- SSEModelo3/length(logYtest)
+RMSE_3_fueramuestra <- sqrt(MSE_3_fueramuestra)
+
+#RMSE Modelo 4
+Modelo_C_4_Summ<-summary(Modelo_C_4)
+rmse_4<-sqrt(mean(Modelo_C_4_Summ$residuals^2))
+print(rmse_4) #RMSE4 =  1.042958
+YhatModelo4 <- predict(Modelo_C_4, XTest)
+SSEModelo4 <- sum((YhatModelo4-logYtest)^2)
+MSE_4_fueramuestra <- SSEModelo4/length(logYtest)
+RMSE_4_fueramuestra <- sqrt(MSE_4_fueramuestra)
+
+
+#RMSE Modelo 5 
+Modelo_C_5_Summ<-summary(Modelo_C_5)
+rmse_5<-sqrt(mean(Modelo_C_5_Summ$residuals^2))
+print(rmse_5) #RMSE3 = 1.132367
+YhatModelo5 <- predict(Modelo_C_5, XTest)
+SSEModelo5 <- sum((YhatModelo5-logYtest)^2)
+MSE_5_fueramuestra <- SSEModelo5/length(logYtest)
+RMSE_5_fueramuestra <- sqrt(MSE_5_fueramuestra)
+
+RMSE_DentroMuestra <- c(rmse_1_dentromuestra, rmse_2, rmse_3, rmse_4, rmse_5)
+RMSE_FueraMuestra <- c(RMSE_1_fueramuestra, RMSE_2_fueramuestra, RMSE_3_fueramuestra, RMSE_4_fueramuestra, RMSE_5_fueramuestra)
+
+ErroresModelos <- data.frame(RMSE_DentroMuestra, RMSE_FueraMuestra)
+NombresModelos <- c("Modelos_C_1", "Modelos_C_2", "Modelos_C_3", "Modelos_C_4", "Modelos_C_5")
+ErroresModelos <- as.matrix(ErroresModelos)
+rownames(ErroresModelos) <- NombresModelos
+write.table(ErroresModelos, file = "ErroresModelos.csv", sep = ",", quote = FALSE, row.names = T)
+
+#El modelo 4 es el que tiene el menor RMSE. Utilizamos la variable P6426 como experiencia de la persona, p6240 para ver qué actividad estaba haciendo la
+#semana pasada y si eso influye en el ingreso, p7090 para ver si la persona quiere trabajar más horas y se incluyen variables polinómicas de grado 2 y 3 del
+#numero de horas trabajadas

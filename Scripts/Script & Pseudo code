@@ -3,12 +3,14 @@
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ##Paquetes 
 rm(list = ls())
-install.packages("rvest")
-require("pacman")
-install.packages("ggpubr")
-install.packages("devtools")
-devtools::install_github("thomasp85/patchwork")
 
+
+
+require("pacman")
+p_load(devtools)
+p_load(ggpubr)
+devtools::install_github("thomasp85/patchwork")
+p_load(rvest)
 library(ggplot2)
 library(patchwork)
 p_load(rio) 
@@ -21,6 +23,8 @@ p_load(scales)
 p_load(ggpubr) 
 p_load(knitr) 
 p_load(kableExtra)
+p_load(broom)
+p_load(caret)
 
 
 #1. En un primer momento se explora el link para verificar la manera en la que está presentada la información
@@ -30,11 +34,11 @@ p_load(kableExtra)
 #Se realiza un loop para cada chunk de valores
 
 #3. Se define la base vacía o la base inicial que será llenada por la información scrapeada de los url
-Pagina1 <- read_html("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_1.html") %>%
-  html_table()  
-class(Pagina1) #La variable es tipo List y toca volverla Data Frame
+#Pagina1 <- read_html("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_1.html") %>%
+#  html_table()  
+#class(Pagina1) #La variable es tipo List y toca volverla Data Frame
 
-Pagina1 <- as.data.frame(Pagina1) # Volvemos la lista un Data Frame
+#Pagina1 <- as.data.frame(Pagina1) # Volvemos la lista un Data Frame
 df <- data.frame()
 
 
@@ -55,20 +59,20 @@ geih <- df # le cambiamos el nombre
 
 #1.
 #Crear una lista vacia en donde se van a almacenar las tablas tomadas del sitio web.
-data=list()
+#data=list()
 #Loop para importar las 10 tablas y añadir a la lista data
-for (i in 1:10){
-  url=paste0('https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_',i,'.html')
-  temp=read_html(url) %>%
-    html_table()
-  data=append(data,temp)
-}
+#for (i in 1:10){
+#  url=paste0('https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_',i,'.html')
+#  temp=read_html(url) %>%
+#    html_table()
+#  data=append(data,temp)
+#}
 
 #Loop para concatenar las bases de datos y formar GEIH
-geih=data.frame()
-for (i in 1:10){
-  geih=rbind(geih,data[[i]])
-}
+#geih=data.frame()
+#for (i in 1:10){
+#  geih=rbind(geih,data[[i]])
+#}
 
 #Se evidencia que no hay restricciones para acceder a los datos y realizar el scrapping, lo anterior por lo que se
 #mencionó con anterioridad de que al ser chunks de información fijos facilita la lectura y extracción de los datos.
@@ -212,8 +216,8 @@ geih_clean %>% #Se revisa que todo el DF esté sin NAs
 #En adición hay ingresos que no se ven reflajados en el ingreso total. Por tal motivo se actualizará
 #esta variable incluyendo los ingresos del último mes no registrados
 geih_clean <- geih_clean %>%
-              mutate(ingtot = ifelse(ingtot == 0, p7500s1a1 + p7500s2a1 + p7500s3a1 + impa +
-                                       isa , ingtot))
+  mutate(ingtot = ifelse(ingtot == 0, p7500s1a1 + p7500s2a1 + p7500s3a1 + impa +
+                           isa , ingtot))
 
 
 ##Existe la opción de normalizar los datos, se agregará el código de manera demostrativa
@@ -416,7 +420,7 @@ d7 <- ggplot(geih_clean, aes(as.factor(sex), ingtot)) +
 
 (d7 | d6) /
   (d5)
-  
+
 ##Estadísticas descriptivas, tablas y figuras
 
 #Variables de interés defindas: 
@@ -464,7 +468,7 @@ by2 <- ggplot(data=geih_clean) +
   geom_histogram(mapping=aes(x=ingtot , group= as.factor(p6210), fill=as.factor(p6210))) + 
   theme_classic()
 by2 + scale_fill_manual(values =c("1"="darkslategray3", "2"="blue", "3"="aquamarine4", "4"="azure3", "5"="chartreuse4", "6"="chocolate3", "9"="coral2"), 
-       label=c("1"="Ninguno", "2"="Preescolar", "3"="Básica Primaria", "4"="Básica Secundaria", "5"="Media", "6"="Superior o universitaria", "9"="No sabe"), name="Nivel Educativo")
+                        label=c("1"="Ninguno", "2"="Preescolar", "3"="Básica Primaria", "4"="Básica Secundaria", "5"="Media", "6"="Superior o universitaria", "9"="No sabe"), name="Nivel Educativo")
 
 
 ##Correlación ingresos y horas trabajadas
@@ -635,17 +639,6 @@ funcion <- expression(beta1+beta2*x+beta3*x^2)
 derivada <- D(funcion,'x')
 peak_age <- (beta2/(-beta3*2))
 peak_age
-
-##O de la siguiente manera con el Boot
-ModeloBoot <- boot(geih_clean, Predictvalues, R = r)
-
- BootSE3 <- as.data.frame(ModeloBoot$t)
-hist(BootSE$V2)
-IC_Mod1age3 <- quantile(BootSE3$V2,c(0.025,0.975))
-IC_AgeMod1age3 <- quantile(BootSE$V3,c(0.025,0.975))
-
-max(modelOLS$fitted.values)
-peaked_age <- ModeloBoot$t0[2]/(-ModeloBoot$t0[3]*2)
 
 #-----------Punto 4 GAP Earnings GAP-------------------
 #-----------Punto 4-------------------
@@ -828,10 +821,10 @@ stargazer(IntervaloDeConfianza, type ="text", out = "IC_Punto4.txt")
 
 #peak age
 PeakAgeMujer <- (ModeloBoot_AgeFEM$t0[3] + ModeloBoot_AgeFEM$t0[5])/(-2*ModeloBoot_AgeFEM$t0[4])
-#Las mujeres tienen su cúspide salarial a los 40.06 años
+#Las mujeres tienen su cúspide salarial a los 39.31 años
 
 PeakAgeHombre <- ModeloBoot_AgeFEM$t0[3]/(-2*ModeloBoot_AgeFEM$t0[4])
-#Los hombres, por su parte tienen su cúspide salarial a los 47.40 años
+#Los hombres, por su parte tienen su cúspide salarial a los 48.25 años
 
 #Punto 4 - Teorema FWL
 #se incorpora la variable oficio en la base de datos 
@@ -863,7 +856,6 @@ reg3_ep<-lm(ingreso_tilde~ female_tilde)
 summary(reg3_ep)
 stargazer(modelo.ols.ep,reg2_ep,reg3_ep, type="text" , out = "TeoremaFWL.txt") 
 #Finalmente, se observa que en las tres regresiones el coeficiente es igual
-
 
 #--------------Punto 5----------------------------------------------
 
@@ -986,3 +978,183 @@ write.table(ErroresModelos, file = "ErroresModelos.csv", sep = ",", quote = FALS
 #El modelo 4 es el que tiene el menor RMSE. Utilizamos la variable P6426 como experiencia de la persona, p6240 para ver qué actividad estaba haciendo la
 #semana pasada y si eso influye en el ingreso, p7090 para ver si la persona quiere trabajar más horas y se incluyen variables polinómicas de grado 2 y 3 del
 #numero de horas trabajadas
+
+#v. Leverage Statistic
+#Usar solo las variables a usas
+p_load(matlib)
+#Solo se seleccionan las variables que se usan en el modelo
+LeverageMatrix <- select(geih.test, female, p6426, informal, p6240, p7090, totalHoursWorked2, totalHoursWorked3)
+str(LeverageMatrix)
+#Es necesario modificar el df ya que no se pueden tener factores en la matrix
+#Se crean dummies para cada caso
+LeverageMatrix$informal <- ifelse(LeverageMatrix$informal == "1", 1, 0)
+LeverageMatrix$p7090 <- ifelse(LeverageMatrix$p7090 == "2", 1, 0)
+LeverageMatrix$p62401 <- ifelse(LeverageMatrix$p6240 == "1", 1, 0)
+LeverageMatrix$p62402 <- ifelse(LeverageMatrix$p6240 == "2", 1, 0)
+LeverageMatrix$p62403 <- ifelse(LeverageMatrix$p6240 == "3", 1, 0)
+LeverageMatrix$p62404 <- ifelse(LeverageMatrix$p6240 == "4", 1, 0)
+LeverageMatrix$p62406 <- ifelse(LeverageMatrix$p6240 == "6", 1, 0)
+LeverageMatrix <- select(LeverageMatrix, -p6240)
+str(LeverageMatrix)
+#Se vuelve matrix
+LeverageMatrix <- data.matrix(LeverageMatrix)
+str(LeverageMatrix)
+LeverageMatrix < as.numeric(LeverageMatrix)
+#Se crea la transpuesta
+TLevMatriz <- t(LeverageMatrix)
+#Multiplicacion de la matriz con su transpuesta
+Lev_por_Trans <- TLevMatriz%*%LeverageMatrix
+#La inversa
+Inv_Lev_por_Trans <- inv(TLevMatriz%*%LeverageMatrix)
+#La Matriz H
+HMatrix <- LeverageMatrix%*%Inv_Lev_por_Trans%*%TLevMatriz
+#La diagonal de la matriz H
+h_j <- diag(HMatrix)
+#Residuales
+red_j <- (logYtest - predict(Modelo_C_4, XTest))
+#EL Alpha
+Alpha_j <- red_j/(1-h_j)
+#Yhat
+Yh_j <- predict(Modelo_C_4, XTest)
+#Introducimos las estadísticas al data fram
+LeverageStatistics <- select(geih.test, female, p6426, informal, p6240, p7090, totalHoursWorked2, totalHoursWorked3, logIng)
+df_statistics <- data.frame(red_j, h_j, Alpha_j, Yh_j)
+LeverageStatistics <- cbind(LeverageStatistics, df_statistics)
+
+ggplot(LeverageStatistics, aes(x=h_j)) + geom_boxplot()
+ggplot(LeverageStatistics, aes(x=Alpha_j)) + geom_boxplot()
+ggplot(LeverageStatistics, aes(x=Alpha_j)) + geom_histogram()
+ggplot(LeverageStatistics, aes(x=red_j)) + geom_histogram(aes(x = Alpha_j))
+
+#Los alphas son casi iguales a los residuales, por ende, no hay un high leverage en este modelo, tal vez esto pase por error en la construccións del modelo
+#Sin embargo, es interesante discutir que las personas con un hat mayor son aquellas con mayor edad.
+
+#B. K-fold Cross Validation
+
+#Modelo 1
+set.seed(10101)
+trControl_1 <- trainControl(method  = "cv",
+                          number  = 10) #funcion para realizar la cross validation dentro de train dividir en 10 folds
+
+Modelo1_cv <- train(logIng ~ female + estrato1 + p6426 + maxEducLevel,
+                    data = geih.train,
+                    trControl = trControl_1,
+                    method = "lm")
+Modelo1_cv
+Modelo1_cv_Yhat <- predict(Modelo1_cv, XTest)
+RMSE_Modelo1_cv <- sqrt(sum((Modelo1_cv_Yhat-logYtest)^2)/length(logYtest))
+
+#Modelo 2
+set.seed(10101)
+trControl_2 <- trainControl(method  = "cv",
+                            number  = 10) #funcion para realizar la cross validation dentro de train dividir en 10 folds
+
+Modelo2_cv <- train(logIng ~ female + p6426 + maxEducLevel + female*maxEducLevel,
+                    data = geih.train,
+                    trControl = trControl_2,
+                    method = "lm")
+Modelo2_cv
+Modelo2_cv_Yhat <- predict(Modelo2_cv, XTest)
+RMSE_Modelo2_cv <- sqrt(sum((Modelo2_cv_Yhat-logYtest)^2)/length(logYtest))
+
+#Modelo 3
+set.seed(10101)
+trControl_3 <- trainControl(method  = "cv",
+                            number  = 10) #funcion para realizar la cross validation dentro de train dividir en 10 folds
+
+Modelo3_cv <- train(logIng ~ female + p6426 + age + age2 + p6426*age,
+                    data = geih.train,
+                    trControl = trControl_3,
+                    method = "lm")
+Modelo3_cv
+Modelo3_cv_Yhat <- predict(Modelo3_cv, XTest)
+RMSE_Modelo3_cv <- sqrt(sum((Modelo3_cv_Yhat-logYtest)^2)/length(logYtest))
+
+#Modelo 4
+set.seed(10101)
+trControl_4 <- trainControl(method  = "cv",
+                            number  = 10) #funcion para realizar la cross validation dentro de train dividir en 10 folds
+
+Modelo4_cv <- train(logIng ~ female + p6426 + informal + p6240 + p7090 + totalHoursWorked2 + totalHoursWorked3,
+                    data = geih.train,
+                    trControl = trControl_4,
+                    method = "lm")
+Modelo4_cv
+Modelo4_cv_Yhat <- predict(Modelo4_cv, XTest)
+RMSE_Modelo4_cv <- sqrt(sum((Modelo4_cv_Yhat-logYtest)^2)/length(logYtest))
+
+#Modelo 5
+set.seed(10101)
+trControl_5 <- trainControl(method  = "cv",
+                            number  = 10) #funcion para realizar la cross validation dentro de train dividir en 10 folds
+
+Modelo5_cv <- train(logIng ~ female + p6426 + totalHoursWorked + age + totalHoursWorked*female + p7090*female,
+                    data = geih.train,
+                    trControl = trControl_5,
+                    method = "lm")
+Modelo5_cv
+Modelo5_cv_Yhat <- predict(Modelo5_cv, XTest)
+RMSE_Modelo5_cv <- sqrt(sum((Modelo5_cv_Yhat-logYtest)^2)/length(logYtest))
+
+#Sigue siendo mejor el modelo 4
+RMSE_CVs <- c(RMSE_Modelo1_cv, RMSE_Modelo2_cv, RMSE_Modelo3_cv, RMSE_Modelo4_cv, RMSE_Modelo5_cv)
+
+#Revisamos los alphas del Modelo 4:
+Resid_j_CV <- (logYtest - Modelo4_cv_Yhat)
+Alpha_j_CV <- (Resid_j_CV)/(1-h_j)
+Df_Cv_M4 <- data.frame(logYtest, Modelo4_cv_Yhat, h_j, Resid_j_CV, Alpha_j_CV)
+#Mismo comportamiento, las observaciones con altos h_j no influyen en la muestra
+
+
+#5.c. LOOCV
+dfLOOCV <- data.frame() #Creamos el df del for
+SSELOOCV <- 0
+MSELOOCV <- 0
+logYtrain <- log(YTrain)
+logYtrain <- ifelse(logYtrain < 0, 0, logYtrain)
+
+for (i in 1:nrow(geih.train)) {
+  
+  dfLOOCV <- geih.train[-i,] #El df del for va a ser sin la i-esima observacion
+  ModeloLOOCV <- lm(logIng ~ female + p6426 + informal + p6240 + p7090 + totalHoursWorked2 + totalHoursWorked3, data = dfLOOCV) #Creo el modelo sin esa observación
+  Yhat_LOOCV <- predict(ModeloLOOCV, XTrain[i,]) #Testeo el modelo
+  Res_LOOCV <- logYtrain[i] - Yhat_LOOCV #saco los residuales
+  Res_LOOCV2 <- Res_LOOCV^2 #Residuales al cuadrado
+  SSELOOCV <- SSELOOCV + Res_LOOCV2 #Sumo los residuales al cuadrado
+  MSELOOCV <- SSELOOCV/i #MSE
+  print(i)
+  print(MSELOOCV)
+}
+
+MSELOOCV
+RMSELOOCV <- sqrt(MSELOOCV)
+
+#Los errores disminuyen con este métedo, pero es muy costoso computacionalmente
+RMSEM4 <- c(RMSE_4_fueramuestra, RMSE_Modelo4_cv, RMSELOOCV)
+
+#Probemos con Caret
+ctrl <- trainControl(method = "LOOCV")
+ModeloLOOCV2 <- train(logIng ~ female + p6426 + informal + p6240 + p7090 + totalHoursWorked2 + totalHoursWorked3, 
+                      data = geih.train,
+                      method = "lm",
+                      trControl = ctrl)
+ModeloLOOCV2
+Yhat_LOOCV2 <- predict(ModeloLOOCV2, XTest)
+RMSE_LOOCV2_Fueramuestra <- sqrt(sum((logYtest-Yhat_LOOCV2)^2)/length(logYtest))
+Resid_j_LOOCV2 <- (logYtest - Modelo4_cv_Yhat)
+Alpha_j_LOOCV2 <- (Resid_j_CV)/(1-h_j)
+Df_LOOCV2 <- data.frame(logYtest, Yhat_LOOCV2, h_j, Resid_j_LOOCV2, Alpha_j_LOOCV2)
+
+head(Df_LOOCV2)
+p_load(psych)
+
+Tabla_5C <- describe(Df_LOOCV2)
+write.table(Tabla_5C, file = "Tabla_5c.csv", sep = ",", quote = FALSE, row.names = T)
+Tabla_5B <- describe(Df_Cv_M4)
+write.table(Tabla_5B, file = "Tabla_5b.csv", sep = ",", quote = FALSE, row.names = T)
+Tabla_5A <- describe(LeverageStatistics)
+write.table(Tabla_5A, file = "Tabla_5a.csv", sep = ",", quote = FALSE, row.names = T)
+
+write.table(geih.train, file = "geihtrain.csv", sep = ",", quote = FALSE, row.names = T)
+write.table(geih.test, file = "geihtest.csv", sep = ",", quote = FALSE, row.names = T)
+#Con este código el RMSE disminuye un poco más pero sigue siendo igual de costoso computacionalmente

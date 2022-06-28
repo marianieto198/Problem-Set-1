@@ -957,7 +957,7 @@ RMSE_3_fueramuestra <- sqrt(MSE_3_fueramuestra)
 
 #RMSE Modelo 4
 Modelo_C_4_Summ<-summary(Modelo_C_4)
-rmse_4<-sqrt(mean(Modelo_C_4_Summ$residuals^2))
+rmse_4<-sqrt(mean(Modelo_C_4$residuals^2))
 print(rmse_4) #RMSE4 =  1.042958
 YhatModelo4 <- predict(Modelo_C_4, XTest)
 SSEModelo4 <- sum((YhatModelo4-logYtest)^2)
